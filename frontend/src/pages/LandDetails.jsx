@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { MapContainer, TileLayer, Polygon } from 'react-leaflet';
-import { FileText, Download, Map as MapIcon, Calendar, Ruler, User, Clock, CheckCircle, XCircle, ArrowLeft, Save, Eye, Sparkles, MessageCircle, Globe, Box } from 'lucide-react';
+import { FileText, Download, Map as MapIcon, Calendar, Ruler, User, Clock, CheckCircle, XCircle, ArrowLeft, Save, Eye, Sparkles, MessageCircle, Globe, Box, CloudSun } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { motion } from 'framer-motion';
@@ -16,7 +16,7 @@ const LandDetails = () => {
   const navigate = useNavigate();
   const { isDarkMode } = useContext(ThemeContext);
   const { t, i18n } = useTranslation();
-  
+
   const [land, setLand] = useState(null);
   const [loading, setLoading] = useState(true);
   const [displayUnit, setDisplayUnit] = useState(null);
@@ -130,15 +130,40 @@ const LandDetails = () => {
     window.open(url, '_blank');
   };
 
+  const openWeather = () => {
+    if (!land.coordinates[0]) return;
+    const { lat, lng } = land.coordinates[0];
+    // Windy.com is much more accurate for coordinate-specific weather and looks professional
+    window.open(`https://www.windy.com/${lat}/${lng}?${lat},${lng},12`, '_blank');
+  };
+
+  const calculateDistance = (p1, p2) => {
+    const R = 6371000; // Radius of Earth in meters
+    const dLat = (p2.lat - p1.lat) * Math.PI / 180;
+    const dLon = (p2.lng - p1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Result in meters
+  };
+
+  const sideLengths = land?.coordinates.map((coord, i) => {
+    const nextCoord = land.coordinates[(i + 1) % land.coordinates.length];
+    return calculateDistance(coord, nextCoord);
+  }) || [];
+
+  const totalPerimeter = sideLengths.reduce((acc, len) => acc + len, 0).toFixed(2);
+
   const exportPDF = async () => {
     window.scrollTo(0, 0);
     const element = document.getElementById("report-content");
     if (!element) return;
 
     const loadingToast = i18n.language === 'gu' ? 'PDF ડાઉનલોડ થઈ રહી છે...' : 'Downloading PDF Report...';
-    
+
     try {
-      const canvas = await html2canvas(element, { 
+      const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
         logging: false,
@@ -159,16 +184,16 @@ const LandDetails = () => {
 
       const imgData = canvas.toDataURL("image/jpeg", 1.0);
       const pdf = new jsPDF("p", "mm", "a4");
-      
+
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      
+
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
-      
+
       const imgWidth = pdfWidth - 20; // 10mm margins
       const imgHeight = (canvasHeight * imgWidth) / canvasWidth;
-      
+
       let heightLeft = imgHeight;
       let position = 10; // Start with 10mm top margin
 
@@ -278,6 +303,12 @@ const LandDetails = () => {
               <Box className="w-5 h-5" /> <span className="hidden lg:inline">3D View</span>
             </button>
             <button
+              onClick={openWeather}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold transition-all px-4 py-2.5 rounded-xl border ${isDarkMode ? 'text-amber-500 border-amber-900/30 hover:bg-amber-900/20' : 'text-amber-600 border-amber-100 hover:bg-amber-50'}`}
+            >
+              <CloudSun className="w-5 h-5" /> <span className="hidden lg:inline">Weather</span>
+            </button>
+            <button
               onClick={exportPDF}
               className="flex-1 sm:flex-none bg-primary hover:bg-primary-dark text-white px-6 sm:px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-primary/20 transition-all transform hover:-translate-y-0.5"
             >
@@ -354,6 +385,7 @@ const LandDetails = () => {
                       </div>
                     </div>
                     <DetailBox icon={<MapIcon className="text-secondary w-4 h-4" />} label={t('points')} value={`${land.coordinates.length} Markers`} isDarkMode={isDarkMode} />
+                    <DetailBox icon={<Ruler className="text-secondary w-4 h-4" />} label={i18n.language === 'gu' ? 'કુલ ઘેરાવો' : 'Perimeter'} value={`${totalPerimeter} m`} isDarkMode={isDarkMode} />
                     <DetailBox icon={<User className="text-secondary w-4 h-4" />} label={t('surveyor')} value={land.user?.name || 'Authorized User'} isDarkMode={isDarkMode} />
                     <DetailBox icon={<Clock className="text-secondary w-4 h-4" />} label={t('method')} value={land.surveyMode === 'gps' ? 'GPS Capture' : 'Manual Map'} isDarkMode={isDarkMode} />
                   </div>
@@ -366,7 +398,7 @@ const LandDetails = () => {
                       "{land.description || 'No additional notes provided for this survey.'}"
                     </p>
                   </div>
-                  
+
                   {/* QR Code Section */}
                   <div className={`p-4 rounded-3xl border flex flex-col items-center justify-center text-center ${isDarkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200 shadow-inner'}`}>
                     <div className="bg-white p-2 rounded-xl mb-3">
@@ -400,11 +432,11 @@ const LandDetails = () => {
                   AI Live Analysis
                 </div>
               </div>
-              
+
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {suggestCrops(land.area.value).map((crop, i) => (
-                  <motion.div 
-                    key={i} 
+                  <motion.div
+                    key={i}
                     className={`p-6 rounded-3xl shadow-sm border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-secondary' : 'bg-white border-slate-100 hover:border-secondary'}`}
                   >
                     <div className="flex justify-between items-center mb-4">
@@ -420,7 +452,7 @@ const LandDetails = () => {
                           <span className="text-secondary">{crop.suitability}%</span>
                         </div>
                         <div className={`w-full h-2 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                          <motion.div 
+                          <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${crop.suitability}%` }}
                             transition={{ duration: 1, delay: i * 0.1 }}
@@ -447,14 +479,14 @@ const LandDetails = () => {
                     const isString = typeof doc === 'string';
                     const docPath = isString ? doc : (doc.url || doc.path || '');
                     const fileName = isString ? doc.split('/').pop() : (doc.name || `Document ${i + 1}`);
-                    
+
                     // Clean up the URL construction
                     const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
                     const cleanPath = docPath.startsWith('/') ? docPath : `/${docPath}`;
                     const fileUrl = `${baseUrl}${cleanPath}`;
 
                     if (!docPath && !isString && !doc.name) return null;
-                    
+
                     return (
                       <div key={i} className={`p-4 rounded-2xl border flex flex-col gap-3 transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-primary' : 'bg-white border-slate-200 hover:border-primary shadow-sm'}`}>
                         <div className="flex items-center gap-3">
@@ -467,15 +499,15 @@ const LandDetails = () => {
                           </div>
                         </div>
                         <div className="flex gap-2 mt-auto">
-                          <a 
-                            href={fileUrl} 
-                            target="_blank" 
+                          <a
+                            href={fileUrl}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary hover:text-white transition-all border border-primary/10"
                           >
                             <Eye className="w-3 h-3" /> {i18n.language === 'gu' ? 'જુઓ' : 'View'}
                           </a>
-                          <button 
+                          <button
                             onClick={() => handleDownload(fileUrl, fileName)}
                             className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-secondary/10 text-secondary text-[10px] font-bold hover:bg-secondary hover:text-white transition-all border border-secondary/10"
                           >
@@ -493,27 +525,53 @@ const LandDetails = () => {
               )}
             </div>
 
-            <div className="mt-12">
-              <h3 className="text-base sm:text-lg font-bold text-primary mb-4">{t('boundary_gps')}</h3>
-              <div className={`rounded-2xl overflow-hidden border overflow-x-auto custom-scrollbar ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
-                <table className="w-full text-left min-w-[500px]">
-                  <thead className={`text-[10px] sm:text-xs font-bold uppercase ${isDarkMode ? 'bg-slate-900 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
-                    <tr>
-                      <th className="p-3 sm:p-4">{t('marker')}</th>
-                      <th className="p-3 sm:p-4">{t('latitude')}</th>
-                      <th className="p-3 sm:p-4">{t('longitude')}</th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${isDarkMode ? 'divide-slate-700' : 'divide-slate-200'}`}>
-                    {land.coordinates.map((coord, i) => (
-                      <tr key={i} className={`text-xs sm:text-sm font-mono ${isDarkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-700 hover:bg-white'}`}>
-                        <td className="p-3 sm:p-4 font-bold text-primary">#{i + 1}</td>
-                        <td className="p-3 sm:p-4">{coord.lat.toFixed(6)}</td>
-                        <td className="p-3 sm:p-4">{coord.lng.toFixed(6)}</td>
+            <div className="mt-12 grid md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-primary mb-4 flex items-center gap-2">
+                  <Ruler className="w-5 h-5" /> {i18n.language === 'gu' ? 'બાજુઓની લંબાઈ' : 'Side Measurements'}
+                </h3>
+                <div className={`rounded-2xl overflow-hidden border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                  <table className="w-full text-left">
+                    <thead className={`text-[10px] font-bold uppercase ${isDarkMode ? 'bg-slate-900 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
+                      <tr>
+                        <th className="p-3">Side</th>
+                        <th className="p-3">Length (Meters)</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className={`divide-y ${isDarkMode ? 'divide-slate-700' : 'divide-slate-200'}`}>
+                      {sideLengths.map((len, i) => (
+                        <tr key={i} className="text-xs">
+                          <td className="p-3 font-bold text-primary">#{i + 1} ➔ #{i + 2 > land.coordinates.length ? 1 : i + 2}</td>
+                          <td className="p-3 font-mono">{len.toFixed(2)} m</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-primary mb-4">{t('boundary_gps')}</h3>
+                <div className={`rounded-2xl overflow-hidden border overflow-x-auto custom-scrollbar ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                  <table className="w-full text-left min-w-[300px]">
+                    <thead className={`text-[10px] sm:text-xs font-bold uppercase ${isDarkMode ? 'bg-slate-900 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
+                      <tr>
+                        <th className="p-3 sm:p-4">{t('marker')}</th>
+                        <th className="p-3 sm:p-4">{t('latitude')}</th>
+                        <th className="p-3 sm:p-4">{t('longitude')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${isDarkMode ? 'divide-slate-700' : 'divide-slate-200'}`}>
+                      {land.coordinates.map((coord, i) => (
+                        <tr key={i} className={`text-xs sm:text-sm font-mono ${isDarkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-700 hover:bg-white'}`}>
+                          <td className="p-3 sm:p-4 font-bold text-primary">#{i + 1}</td>
+                          <td className="p-3 sm:p-4">{coord.lat.toFixed(6)}</td>
+                          <td className="p-3 sm:p-4">{coord.lng.toFixed(6)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
