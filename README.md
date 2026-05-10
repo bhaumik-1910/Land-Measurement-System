@@ -104,5 +104,8 @@ graph TD
 ## 📜 License
 Distributed under the MIT License. See `LICENSE` for more information.
 
----
+
 **Developed with ❤️ for the Future of Agriculture & Urban Planning.**
+<div align="center">
+  <p>Made with ❤️ by Bhaumik Kothiya</p>
+</div>
