@@ -295,7 +295,7 @@ const LandDetails = () => {
             </div>
 
             {/* AI Crop Section - Enhanced */}
-            <div className={`mt-12 p-8 rounded-[2rem] border transition-all ${isDarkMode ? 'bg-gradient-to-br from-slate-900 to-primary/10 border-slate-700' : 'bg-gradient-to-br from-secondary/5 to-primary/5 border-secondary/20 shadow-inner'}`}>
+            <div data-html2canvas-ignore="true" className={`mt-12 p-8 rounded-[2rem] border transition-all ${isDarkMode ? 'bg-gradient-to-br from-slate-900 to-primary/10 border-slate-700' : 'bg-gradient-to-br from-secondary/5 to-primary/5 border-secondary/20 shadow-inner'}`}>
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
                   <h3 className="text-xl sm:text-2xl font-black text-primary flex items-center gap-3">
@@ -337,7 +337,7 @@ const LandDetails = () => {
                         </div>
                       </div>
                       <p className={`text-[11px] leading-relaxed font-medium ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                        {i18n.language === 'gu' ? getGujaratiReason(crop.name) : crop.reason}
+                        {i18n.language === 'gu' ? getGujaratiReason(crop) : crop.reason}
                       </p>
                     </div>
                   </motion.div>
@@ -403,19 +403,31 @@ const getGujaratiCropName = (name) => {
     'Wheat': 'ઘઉં',
     'Cotton': 'કપાસ',
     'Sugarcane': 'શેરડી',
-    'Maize': 'મકાઈ'
+    'Maize': 'મકાઈ',
+    'Groundnut': 'મગફળી',
+    'Castor': 'એરંડા',
+    'Bajra': 'બાજરી',
+    'Cumin': 'જીરું',
+    'Mustard': 'રાઈ',
+    'Tobacco': 'તમાકુ'
   };
   return mapping[name] || name;
 };
 
-const getGujaratiReason = (name) => {
+const getGujaratiReason = (crop) => {
   const mapping = {
     'Wheat': 'આ વિસ્તારમાં જમીનનો ભેજ ઉત્તમ છે.',
     'Cotton': 'તાપમાન કપાસના પાક માટે અનુકૂળ છે.',
     'Sugarcane': 'પુષ્કળ પાણીની જરૂરિયાત પૂરી થઈ શકે તેમ છે.',
-    'Maize': 'જમીનમાં પાણીનો નિકાલ સારો છે.'
+    'Maize': 'જમીનમાં પાણીનો નિકાલ સારો છે.',
+    'Groundnut': 'રેતાળ-ગોરાડુ જમીન મગફળી માટે શ્રેષ્ઠ છે.',
+    'Castor': 'આ વિસ્તારની આબોહવા એરંડા માટે અનુકૂળ છે.',
+    'Bajra': 'ઓછા પાણીમાં પણ સારો પાક મળી શકે છે.',
+    'Cumin': 'જીરું માટે જરૂરી ઠંડુ વાતાવરણ અહીં ઉપલબ્ધ છે.',
+    'Mustard': 'રાઈના પાક માટે જમીનનો pH સ્તર યોગ્ય છે.',
+    'Tobacco': 'મોટા પાયે વાવેતર માટે જમીન ફળદ્રુપ છે.'
   };
-  return mapping[name] || name;
+  return mapping[crop.name] || crop.reason;
 };
 
 export default LandDetails;
