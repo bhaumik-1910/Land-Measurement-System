@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { MapContainer, TileLayer, Polygon } from 'react-leaflet';
-import { FileText, Download, Map as MapIcon, Calendar, Ruler, User, Clock, CheckCircle, XCircle, ArrowLeft, Save, Eye, Sparkles } from 'lucide-react';
+import { FileText, Download, Map as MapIcon, Calendar, Ruler, User, Clock, CheckCircle, XCircle, ArrowLeft, Save, Eye, Sparkles, MessageCircle, Globe, Box } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { motion } from 'framer-motion';
@@ -71,6 +71,63 @@ const LandDetails = () => {
     const newVal = convertValue(land.area.value, 'sq.meter', newUnit);
     setDisplayValue(newVal);
     setDisplayUnit(newUnit);
+  };
+
+  const exportKML = () => {
+    try {
+      const kmlCoords = [...land.coordinates, land.coordinates[0]]
+        .map(c => `${c.lng},${c.lat},0`)
+        .join("\n            ");
+
+      const kmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${land.title}</name>
+    <description>${land.description || 'Land Survey Report'}</description>
+    <Style id="polyStyle">
+      <LineStyle><color>ff0000ff</color><width>2</width></LineStyle>
+      <PolyStyle><color>4dff0000</color></PolyStyle>
+    </Style>
+    <Placemark>
+      <name>${land.title}</name>
+      <styleUrl>#polyStyle</styleUrl>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+            ${kmlCoords}
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>`;
+
+      const blob = new Blob([kmlContent], { type: 'application/vnd.google-earth.kml+xml' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${land.title.replace(/\s+/g, '_')}_GIS.kml`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("KML Export failed:", err);
+    }
+  };
+
+  const shareWhatsApp = () => {
+    const text = `*Smart Land Survey Report*\n\n*Title:* ${land.title}\n*Area:* ${displayValue} ${displayUnit}\n*Status:* ${land.status.toUpperCase()}\n\nView Full Report here: ${verificationURL}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const open3DView = () => {
+    if (!land.coordinates[0]) return;
+    const { lat, lng } = land.coordinates[0];
+    // Professional Google Earth Web URL for 3D immersive view
+    // 500d: altitude, 45t: 45 degree tilt for 3D effect
+    const url = `https://earth.google.com/web/@${lat},${lng},500d,35y,0h,45t,0r`;
+    window.open(url, '_blank');
   };
 
   const exportPDF = async () => {
@@ -201,12 +258,24 @@ const LandDetails = () => {
               </button>
             </div>
           </div>
-          <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
             <button
-              onClick={() => navigate('/dashboard')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold transition-colors px-4 py-2.5 rounded-xl border ${isDarkMode ? 'text-slate-300 border-slate-700 hover:bg-slate-800' : 'text-gray-600 border-slate-100 hover:bg-slate-50'}`}
+              onClick={shareWhatsApp}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold transition-all px-4 py-2.5 rounded-xl border ${isDarkMode ? 'text-green-400 border-green-900/30 hover:bg-green-900/20' : 'text-green-600 border-green-100 hover:bg-green-50'}`}
             >
-              {t('dashboard')}
+              <MessageCircle className="w-5 h-5" /> <span className="hidden lg:inline">WhatsApp</span>
+            </button>
+            <button
+              onClick={exportKML}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold transition-all px-4 py-2.5 rounded-xl border ${isDarkMode ? 'text-blue-400 border-blue-900/30 hover:bg-blue-900/20' : 'text-blue-600 border-blue-100 hover:bg-blue-50'}`}
+            >
+              <Globe className="w-5 h-5" /> <span className="hidden lg:inline">GIS (KML)</span>
+            </button>
+            <button
+              onClick={open3DView}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold transition-all px-4 py-2.5 rounded-xl border ${isDarkMode ? 'text-purple-400 border-purple-900/30 hover:bg-purple-900/20' : 'text-purple-600 border-purple-100 hover:bg-purple-50'}`}
+            >
+              <Box className="w-5 h-5" /> <span className="hidden lg:inline">3D View</span>
             </button>
             <button
               onClick={exportPDF}
