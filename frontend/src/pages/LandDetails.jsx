@@ -152,6 +152,29 @@ const LandDetails = () => {
   const center = land.coordinates[0] ? [land.coordinates[0].lat, land.coordinates[0].lng] : [20.5937, 78.9629];
   const verificationURL = `${window.location.origin}/land/${land._id}`;
 
+  const handleDownload = async (url, filename) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download failed:", err);
+      // Fallback: trigger a direct download link if fetch fails (CORS etc)
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.target = "_blank";
+      link.click();
+    }
+  };
+
   return (
     <div className={`min-h-screen pt-20 pb-12 px-4 sm:px-6 transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
       <div className="max-w-6xl mx-auto">
@@ -343,6 +366,62 @@ const LandDetails = () => {
                   </motion.div>
                 ))}
               </div>
+            </div>
+
+            <div className="mt-12">
+              <h3 className="text-base sm:text-lg font-bold text-primary mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5" /> {i18n.language === 'gu' ? 'અપલોડ કરેલા દસ્તાવેજો' : 'Uploaded Documents'}
+              </h3>
+              {land.documents && land.documents.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {land.documents.map((doc, i) => {
+                    const isString = typeof doc === 'string';
+                    const docPath = isString ? doc : (doc.url || doc.path || '');
+                    const fileName = isString ? doc.split('/').pop() : (doc.name || `Document ${i + 1}`);
+                    
+                    // Clean up the URL construction
+                    const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
+                    const cleanPath = docPath.startsWith('/') ? docPath : `/${docPath}`;
+                    const fileUrl = `${baseUrl}${cleanPath}`;
+
+                    if (!docPath && !isString && !doc.name) return null;
+                    
+                    return (
+                      <div key={i} className={`p-4 rounded-2xl border flex flex-col gap-3 transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-primary' : 'bg-white border-slate-200 hover:border-primary shadow-sm'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                            <FileText className="w-5 h-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[10px] font-black text-primary truncate uppercase tracking-tighter">{fileName}</div>
+                            <div className={`text-[8px] font-bold ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>DOCUMENT #{i + 1}</div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-auto">
+                          <a 
+                            href={fileUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary hover:text-white transition-all border border-primary/10"
+                          >
+                            <Eye className="w-3 h-3" /> {i18n.language === 'gu' ? 'જુઓ' : 'View'}
+                          </a>
+                          <button 
+                            onClick={() => handleDownload(fileUrl, fileName)}
+                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-secondary/10 text-secondary text-[10px] font-bold hover:bg-secondary hover:text-white transition-all border border-secondary/10"
+                          >
+                            <Download className="w-3 h-3" /> {i18n.language === 'gu' ? 'ડાઉનલોડ' : 'Download'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className={`p-8 rounded-2xl border border-dashed text-center ${isDarkMode ? 'bg-slate-800/20 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-gray-400'}`}>
+                  <div className="text-xs font-bold">{i18n.language === 'gu' ? 'કોઈ દસ્તાવેજો ઉપલબ્ધ નથી' : 'No documents available for this record.'}</div>
+                </div>
+              )}
             </div>
 
             <div className="mt-12">

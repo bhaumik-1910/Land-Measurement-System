@@ -53,7 +53,7 @@ const Home = () => {
             transition={{ duration: 0.8 }}
             className="w-full"
           >
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 mb-6">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 mb-6 mt-[20px]">
               <Sparkles className="w-4 h-4 text-secondary-light" />
               <span className="text-xs font-bold uppercase tracking-widest">{i18n.language === 'gu' ? 'ગુજરાતનું પ્રથમ સ્માર્ટ સર્વે પ્લેટફોર્મ' : 'Gujarat\'s #1 Smart Survey Platform'}</span>
             </div>

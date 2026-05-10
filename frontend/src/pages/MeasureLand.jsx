@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { MapContainer, TileLayer, FeatureGroup, useMap, Polygon } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, useMap, Polygon, CircleMarker, Popup, Tooltip } from 'react-leaflet';
 import { getAreaOfPolygon, getDistance } from 'geolib';
-import { Ruler, Save, Trash2, Map as MapIcon, Crosshair, Navigation, Layers, CheckCircle, ArrowRightLeft, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Ruler, Save, Trash2, Map as MapIcon, Crosshair, Navigation, Layers, CheckCircle, ArrowRightLeft, Eye, EyeOff, Sparkles, MapPin, FileText } from 'lucide-react';
 import api from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,6 +17,13 @@ const GeomanControl = ({ onCreated, onEdited }) => {
 
   useEffect(() => {
     if (!map) return;
+
+    map.pm.setGlobalOptions({ 
+      snappingDistance: 20,
+      allowSelfIntersection: false,
+      templineStyle: { color: '#3b82f6', dashArray: '5, 5' },
+      hintlineStyle: { color: '#3b82f6', dashArray: '5, 5' },
+    });
 
     map.pm.addControls({
       position: 'topright',
@@ -110,6 +117,7 @@ const MeasureLand = () => {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [currentLocation, setCurrentLocation] = useState(null);
 
   const { isDarkMode } = useContext(ThemeContext);
   const { t, i18n } = useTranslation();
@@ -176,15 +184,25 @@ const MeasureLand = () => {
     watchId.current = navigator.geolocation.watchPosition(
       (pos) => {
         const newCoord = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setCoordinates(prev => {
-          const updated = [...prev, newCoord];
-          if (updated.length >= 3) setArea(calculateArea(updated));
-          return updated;
-        });
+        setCurrentLocation(newCoord);
+        // We no longer automatically push to coordinates to ensure accuracy
       },
       (err) => console.error(err),
-      { enableHighAccuracy: true, distanceFilter: 1 }
+      { enableHighAccuracy: true, distanceFilter: 0 }
     );
+  };
+
+  const dropGPSMarker = () => {
+    if (!currentLocation) {
+      toast.error("Waiting for GPS signal...");
+      return;
+    }
+    setCoordinates(prev => {
+      const updated = [...prev, currentLocation];
+      if (updated.length >= 3) setArea(calculateArea(updated));
+      return updated;
+    });
+    toast.success(i18n.language === 'gu' ? 'પોઈન્ટ ઉમેર્યો' : 'Point added');
   };
 
   const stopTracking = () => {
@@ -238,6 +256,52 @@ const MeasureLand = () => {
     }
   };
 
+  const exportToCSV = () => {
+    // If the user is in manual mode and still drawing, the coordinates state might be empty
+    // since we finalise it on pm:create.
+    if (surveyMode === 'manual' && coordinates.length === 0) {
+      toast.error(i18n.language === 'gu' ? 'મહેરબાની કરીને પહેલા માપણી પૂરી કરો (પહેલા પોઈન્ટ પર ક્લિક કરીને)' : "Please finish the measurement first (by clicking the first point)");
+      return;
+    }
+
+    if (coordinates.length === 0) {
+      toast.error("No coordinates found to export");
+      return;
+    }
+
+    try {
+      const headers = ["Marker ID", "Latitude", "Longitude"];
+      const csvRows = [
+        headers.join(","),
+        ...coordinates.map((c, i) => `${i + 1},${c.lat},${c.lng}`)
+      ];
+      
+      const csvString = csvRows.join("\n");
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Survey_${title.replace(/\s+/g, '_') || 'Data'}_${new Date().toLocaleDateString()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success(i18n.language === 'gu' ? 'CSV ફાઈલ ડાઉનલોડ થઈ ગઈ' : "CSV Exported successfully!");
+    } catch (err) {
+      console.error("Export error:", err);
+      toast.error("Failed to generate CSV");
+    }
+  };
+
+  const getCentroid = (coords) => {
+    if (coords.length === 0) return [0, 0];
+    const lat = coords.reduce((sum, c) => sum + c.lat, 0) / coords.length;
+    const lng = coords.reduce((sum, c) => sum + c.lng, 0) / coords.length;
+    return [lat, lng];
+  };
+
   return (
     <div className={`h-[calc(100vh-64px)] flex flex-col md:flex-row overflow-hidden relative transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
       {/* Mobile Header Overlay */}
@@ -286,6 +350,15 @@ const MeasureLand = () => {
               {surveyMode === 'manual' ? <Crosshair className="w-3 h-3" /> : <MapIcon className="w-3 h-3" />}
               {surveyMode === 'manual' ? (i18n.language === 'gu' ? 'GPS મોડ' : 'GPS Mode') : (i18n.language === 'gu' ? 'મેન્યુઅલ મોડ' : 'Manual Mode')}
             </button>
+            {surveyMode === 'gps' && isTracking && (
+              <button 
+                onClick={dropGPSMarker}
+                className="bg-secondary text-white px-4 py-2 rounded-xl text-[10px] font-bold shadow-xl pointer-events-auto flex items-center gap-2 border border-white/20 animate-pulse"
+              >
+                <MapPin className="w-3 h-3" />
+                {i18n.language === 'gu' ? 'પોઈન્ટ મૂકો' : 'Drop Point'}
+              </button>
+            )}
             <button 
               onClick={() => setMapType(mapType === 'normal' ? 'satellite' : 'normal')}
               className={`backdrop-blur-md px-4 py-2 rounded-xl text-[10px] font-bold shadow-xl pointer-events-auto flex items-center gap-2 border ${isDarkMode ? 'bg-slate-800/80 text-white border-slate-700' : 'bg-white/80 text-primary border-black/5'}`}
@@ -392,10 +465,10 @@ const MeasureLand = () => {
               className={`p-6 rounded-[2rem] border transition-all ${isDarkMode ? 'bg-blue-900/10 border-blue-800' : 'bg-blue-50/50 border-blue-100 shadow-inner'}`}
             >
               <h4 className={`font-black mb-2 flex items-center gap-2 text-sm ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>
-                <CheckCircle className="w-4 h-4" /> {i18n.language === 'gu' ? 'GPS ટ્રેકિંગ ચાલુ છે' : 'GPS Tracking Active'}
+                <CheckCircle className="w-4 h-4" /> {isTracking ? (currentLocation ? (i18n.language === 'gu' ? 'GPS સિગ્નલ મજબૂત છે' : 'GPS Signal Strong') : (i18n.language === 'gu' ? 'સિગ્નલ શોધી રહ્યા છીએ...' : 'Acquiring Signal...')) : (i18n.language === 'gu' ? 'GPS ટ્રેકિંગ બંધ છે' : 'GPS Tracking Ready')}
               </h4>
               <p className={`text-xs mb-5 font-medium leading-relaxed ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>
-                {i18n.language === 'gu' ? 'તમારી જમીનની સીમા પર ચાલો જેથી તે ઓટોમેટિક મેપ થઈ જાય.' : 'Walk along the perimeter of your land to map it automatically.'}
+                {i18n.language === 'gu' ? 'જમીનના ખૂણા પર જઈને "Drop Marker" બટન દબાવો.' : 'Walk to a corner of the land and click "Drop Marker" to capture the point.'}
               </p>
               {!isTracking ? (
                 <button
@@ -405,18 +478,37 @@ const MeasureLand = () => {
                   <Crosshair className="w-5 h-5" /> {i18n.language === 'gu' ? 'ટ્રેકિંગ શરૂ કરો' : 'Start Capture'}
                 </button>
               ) : (
-                <button
-                  onClick={stopTracking}
-                  className="w-full bg-red-500 hover:bg-red-600 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 animate-pulse transition-all shadow-xl shadow-red-500/20"
-                >
-                  <Trash2 className="w-5 h-5" /> {i18n.language === 'gu' ? 'ટ્રેકિંગ બંધ કરો' : 'Stop Capture'}
-                </button>
+                <div className="space-y-3">
+                  <button
+                    onClick={dropGPSMarker}
+                    className="w-full bg-secondary hover:bg-secondary-dark text-white py-5 rounded-2xl font-black text-base flex items-center justify-center gap-3 transition-all shadow-xl shadow-secondary/20 active:scale-95 border-2 border-white/20"
+                  >
+                    <MapPin className="w-6 h-6" /> {i18n.language === 'gu' ? 'અહીં પોઈન્ટ મૂકો' : 'Drop Marker Here'}
+                  </button>
+                  <button
+                    onClick={stopTracking}
+                    className={`w-full py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                  >
+                    <Trash2 className="w-4 h-4" /> {i18n.language === 'gu' ? 'ટ્રેકિંગ બંધ કરો' : 'Stop Capture'}
+                  </button>
+                </div>
               )}
             </motion.div>
           )}
 
           {/* Map View Toggle - Professional Card */}
           <div className="space-y-4">
+            <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>{i18n.language === 'gu' ? 'એક્સ્પોર્ટ ઓપ્શન્સ' : 'Export Options'}</div>
+            <button
+              onClick={exportToCSV}
+              disabled={coordinates.length === 0}
+              className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl border font-bold text-xs transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700' : 'bg-slate-50 border-slate-200 text-blue-600 hover:bg-slate-100'} disabled:opacity-30 disabled:grayscale shadow-sm`}
+            >
+              <FileText className="w-4 h-4" /> {i18n.language === 'gu' ? 'CSV માં ડાઉનલોડ કરો' : 'Export Coordinates (CSV)'}
+            </button>
+          </div>
+
+          <div className="space-y-4 pt-2">
             <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>{i18n.language === 'gu' ? 'મેપ પ્રકાર' : 'Map Type'}</div>
             <button
               onClick={() => setMapType(mapType === 'normal' ? 'satellite' : 'normal')}
@@ -426,7 +518,7 @@ const MeasureLand = () => {
                 <MapIcon className="w-4 h-4" />
                 <span className="text-xs font-bold">{mapType === 'satellite' ? 'Satellite' : 'Normal'}</span>
               </div>
-              <div className="px-4 text-xs font-bold text-primary group-hover:underline">
+              <div className="px-4 text-xs font-bold text-primary group-hover:underline uppercase tracking-tighter">
                 {i18n.language === 'gu' ? 'બદલો' : 'Switch'}
               </div>
             </button>
@@ -465,8 +557,28 @@ const MeasureLand = () => {
             <>
               <Polygon
                 positions={coordinates.map(c => [c.lat, c.lng])}
-                pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.3 }}
-              />
+                pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.3, weight: 3 }}
+              >
+                {coordinates.length >= 3 && (
+                  <Tooltip permanent direction="center" className="area-tooltip">
+                    <div className="flex flex-col items-center bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-xl border border-primary/20">
+                      <div className="text-[8px] font-black uppercase text-primary tracking-tighter leading-none mb-1">Measured Area</div>
+                      <div className="text-sm font-black text-secondary leading-none">{convertArea(area, unit)} <span className="text-[8px] font-bold text-gray-500">{unit.split('.')[1] || unit}</span></div>
+                    </div>
+                  </Tooltip>
+                )}
+              </Polygon>
+              {currentLocation && (
+                <CircleMarker 
+                  center={[currentLocation.lat, currentLocation.lng]}
+                  radius={8}
+                  pathOptions={{ color: 'white', fillColor: '#3b82f6', fillOpacity: 1, weight: 3 }}
+                >
+                  <Popup>
+                    <div className="text-xs font-bold">Your Current Location</div>
+                  </Popup>
+                </CircleMarker>
+              )}
               <MapUpdater coords={coordinates} />
             </>
           )}
@@ -580,7 +692,7 @@ const MapUpdater = ({ coords }) => {
   useEffect(() => {
     if (coords.length > 0) {
       const last = coords[coords.length - 1];
-      map.setView([last.lat, last.lng], 18);
+      map.setView([last.lat, last.lng], map.getZoom());
     }
   }, [coords, map]);
   return null;
