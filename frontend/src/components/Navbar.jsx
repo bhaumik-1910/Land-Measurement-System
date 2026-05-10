@@ -1,11 +1,15 @@
 import React, { useContext, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { Map, LayoutDashboard, User as UserIcon, LogOut, Menu, X, ShieldCheck, Ruler, Home } from 'lucide-react';
+import { ThemeContext } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
+import { Map, LayoutDashboard, User as UserIcon, LogOut, Menu, X, ShieldCheck, Ruler, Home, Sun, Moon, Languages } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar = () => {
   const { user, logout } = useContext(AuthContext);
+  const { isDarkMode, toggleTheme } = useContext(ThemeContext);
+  const { t, i18n } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -16,27 +20,32 @@ const Navbar = () => {
     setIsMenuOpen(false);
   };
 
-  const navLinks = [
-    { name: 'Home', path: '/', icon: <Home className="w-4 h-4" />, auth: true },
-    { name: 'My Records', path: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" />, auth: true },
-    { name: 'Measure Land', path: '/measure', icon: <Ruler className="w-4 h-4" />, auth: true },
-  ];
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'gu' : 'en';
+    i18n.changeLanguage(newLang);
+    localStorage.setItem('language', newLang);
+  };
 
+  const navLinks = [
+    { name: t('home'), path: '/', icon: <Home className="w-4 h-4" />, auth: true },
+    { name: t('my_records'), path: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" />, auth: true },
+    { name: t('measure_land'), path: '/measure', icon: <Ruler className="w-4 h-4" />, auth: true },
+  ];
 
   const closeMenu = () => setIsMenuOpen(false);
 
   return (
-    <nav className="bg-primary text-white shadow-lg border-b border-primary-dark sticky top-0 z-[2000]">
+    <nav className={`${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-primary border-primary-dark'} text-white shadow-lg border-b sticky top-0 z-[2000] transition-colors duration-300`}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex justify-between h-16 items-center">
           {/* Logo Section */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2" onClick={closeMenu}>
               <div className="bg-white p-1.5 rounded-lg shadow-inner">
-                <Map className="w-6 h-6 text-primary" />
+                <Map className={`w-6 h-6 ${isDarkMode ? 'text-slate-900' : 'text-primary'}`} />
               </div>
               <span className="text-xl font-black tracking-tighter">
-                SMART<span className="text-secondary-light">SURVEY</span>
+                SMART<span className={isDarkMode ? 'text-secondary' : 'text-secondary-light'}>SURVEY</span>
               </span>
             </Link>
           </div>
@@ -48,7 +57,7 @@ const Navbar = () => {
                 <Link
                   key={link.path}
                   to={link.path}
-                  className={`flex items-center gap-2 hover:text-secondary-light transition-all font-bold text-sm tracking-wide ${location.pathname === link.path ? 'text-secondary-light' : 'text-blue-100/80'}`}
+                  className={`flex items-center gap-2 transition-all font-bold text-sm tracking-wide ${location.pathname === link.path ? 'text-secondary-light' : 'text-blue-100/80 hover:text-secondary-light'}`}
                 >
                   {link.name}
                 </Link>
@@ -60,16 +69,35 @@ const Navbar = () => {
                 className={`flex items-center space-x-1 font-black text-sm hover:text-yellow-400 transition-all ${location.pathname === '/admin' ? 'text-yellow-400' : 'text-accent'}`}
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span>ADMIN PANEL</span>
+                <span>{t('admin_panel')}</span>
               </Link>
             )}
           </div>
 
           {/* Action Buttons / User Section */}
           <div className="flex items-center space-x-2 sm:space-x-4">
+            {/* Language Switcher */}
+            <button
+              onClick={toggleLanguage}
+              className={`p-2 rounded-xl transition-all border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-primary-dark border-blue-800'} hover:scale-110 active:scale-95 flex items-center gap-2`}
+              title="Change Language"
+            >
+              <Languages className="w-4 h-4 text-secondary-light" />
+              <span className="text-[10px] font-bold uppercase">{i18n.language === 'en' ? 'GU' : 'EN'}</span>
+            </button>
+
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className={`p-2 rounded-xl transition-all border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-primary-dark border-blue-800'} hover:scale-110 active:scale-95`}
+              title={isDarkMode ? 'Switch to Light' : 'Switch to Dark'}
+            >
+              {isDarkMode ? <Sun className="w-4 h-4 text-yellow-400" /> : <Moon className="w-4 h-4 text-blue-200" />}
+            </button>
+
             {user ? (
               <div className="flex items-center space-x-2 sm:space-x-4">
-                <div className="hidden sm:flex items-center space-x-2 bg-primary-dark px-4 py-1.5 rounded-full border border-blue-800 shadow-inner">
+                <div className={`hidden sm:flex items-center space-x-2 px-4 py-1.5 rounded-full border shadow-inner ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-primary-dark border-blue-800'}`}>
                   <UserIcon className="w-4 h-4 text-secondary-light" />
                   <span className="text-xs font-bold uppercase tracking-wider">{user.name}</span>
                 </div>
@@ -87,13 +115,13 @@ const Navbar = () => {
                   to="/login"
                   className="px-4 py-2 rounded-xl font-bold text-sm hover:bg-primary-dark transition-all text-blue-100"
                 >
-                  Login
+                  {t('login')}
                 </Link>
                 <Link
                   to="/register"
                   className="bg-secondary hover:bg-secondary-dark px-6 py-2.5 rounded-xl font-bold text-sm shadow-xl shadow-secondary/20 transition-all hover:-translate-y-0.5"
                 >
-                  Register
+                  {t('register')}
                 </Link>
               </div>
             )}
@@ -101,7 +129,7 @@ const Navbar = () => {
             {/* Mobile Menu Toggle Button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="lg:hidden p-2.5 rounded-xl bg-primary-dark border border-blue-800 text-white transition-all active:scale-95"
+              className={`lg:hidden p-2.5 rounded-xl border text-white transition-all active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-primary-dark border-blue-800'}`}
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -120,13 +148,13 @@ const Navbar = () => {
             className="fixed inset-0 z-[3000] lg:hidden"
           >
             {/* Backdrop */}
-            <div className="absolute inset-0 bg-primary/40 backdrop-blur-md" onClick={closeMenu} />
+            <div className={`absolute inset-0 backdrop-blur-md ${isDarkMode ? 'bg-slate-950/40' : 'bg-primary/40'}`} onClick={closeMenu} />
 
             {/* Sidebar content */}
-            <div className="absolute right-0 top-0 bottom-0 w-[280px] bg-primary shadow-2xl border-l border-white/10 p-6 pt-20 flex flex-col">
+            <div className={`absolute right-0 top-0 bottom-0 w-[280px] shadow-2xl border-l p-6 pt-20 flex flex-col ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-primary border-white/10'}`}>
               <div className="flex flex-col space-y-4">
                 {user && (
-                  <div className="bg-primary-dark/50 p-4 rounded-2xl border border-white/5 mb-4 flex items-center gap-3">
+                  <div className={`p-4 rounded-2xl border mb-4 flex items-center gap-3 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-primary-dark/50 border-white/5'}`}>
                     <div className="bg-secondary p-2 rounded-lg">
                       <UserIcon className="w-5 h-5 text-white" />
                     </div>
@@ -158,7 +186,7 @@ const Navbar = () => {
                     className={`flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-base transition-all ${location.pathname === '/admin' ? 'bg-accent text-primary shadow-xl' : 'text-accent hover:bg-accent/10'}`}
                   >
                     <ShieldCheck className="w-5 h-5" />
-                    ADMIN PANEL
+                    {t('admin_panel')}
                   </Link>
                 )}
 
@@ -169,14 +197,14 @@ const Navbar = () => {
                       onClick={closeMenu}
                       className="w-full text-center py-4 rounded-2xl font-black text-blue-100 hover:bg-white/5 transition-all"
                     >
-                      Log In
+                      {t('login')}
                     </Link>
                     <Link
                       to="/register"
                       onClick={closeMenu}
                       className="w-full text-center py-4 rounded-2xl font-black bg-secondary text-white shadow-xl shadow-secondary/20"
                     >
-                      Sign Up Free
+                      {t('register')}
                     </Link>
                   </div>
                 )}
@@ -187,7 +215,7 @@ const Navbar = () => {
                     className="mt-auto flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-red-400 hover:bg-red-400/10 transition-all"
                   >
                     <LogOut className="w-5 h-5" />
-                    Sign Out
+                    {t('logout')}
                   </button>
                 )}
               </div>
@@ -204,4 +232,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-

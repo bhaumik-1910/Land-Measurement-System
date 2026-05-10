@@ -1,16 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { MapContainer, TileLayer, Polygon } from 'react-leaflet';
-import { FileText, Download, Map as MapIcon, Calendar, Ruler, User, Clock, CheckCircle, XCircle, ArrowLeft, Save, Eye } from 'lucide-react';
+import { FileText, Download, Map as MapIcon, Calendar, Ruler, User, Clock, CheckCircle, XCircle, ArrowLeft, Save, Eye, Sparkles } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { motion } from 'framer-motion';
 import { suggestCrops } from '../utils/cropAI';
+import { ThemeContext } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
+import { QRCodeSVG } from 'qrcode.react';
 
 const LandDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isDarkMode } = useContext(ThemeContext);
+  const { t, i18n } = useTranslation();
+  
   const [land, setLand] = useState(null);
   const [loading, setLoading] = useState(true);
   const [displayUnit, setDisplayUnit] = useState(null);
@@ -67,99 +73,61 @@ const LandDetails = () => {
     setDisplayUnit(newUnit);
   };
 
-  const downloadFile = async (url, filename) => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename || 'download';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (error) {
-      console.error('Download failed:', error);
-      window.open(url, '_blank');
-    }
-  };
-
   const exportPDF = async () => {
-    // Force scroll to top and ensure all elements are visible
     window.scrollTo(0, 0);
-
     const element = document.getElementById("report-content");
     if (!element) return;
 
+    const loadingToast = i18n.language === 'gu' ? 'PDF ડાઉનલોડ થઈ રહી છે...' : 'Downloading PDF Report...';
+    
     try {
       const canvas = await html2canvas(element, { 
         scale: 2,
         useCORS: true,
         logging: false,
         allowTaint: true,
-        backgroundColor: '#ffffff',
-        width: 1280, // Force desktop width for capture
-        windowWidth: 1280, // Ensure layout engine sees desktop width
+        backgroundColor: isDarkMode ? '#020617' : '#ffffff',
+        width: 1200,
+        windowWidth: 1200,
         onclone: (clonedDoc) => {
           const clonedElement = clonedDoc.getElementById("report-content");
           if (clonedElement) {
-            // Force desktop-like styles for the PDF capture
-            clonedElement.style.width = "1280px";
+            clonedElement.style.width = "1200px";
             clonedElement.style.borderRadius = "0px";
+            clonedElement.style.boxShadow = "none";
             clonedElement.style.border = "none";
-            clonedElement.style.padding = "40px";
-            
-            // Fix any mobile-specific layout changes
-            const gridContainers = clonedElement.querySelectorAll('.grid');
-            gridContainers.forEach(grid => {
-              // Force 2 columns for specs if it was stacked on mobile
-              if (grid.classList.contains('sm:grid-cols-2')) {
-                grid.style.display = 'grid';
-                grid.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
-                grid.style.gap = '24px';
-              }
-              // Force 3 columns for documents
-              if (grid.classList.contains('lg:grid-cols-3')) {
-                grid.style.display = 'grid';
-                grid.style.gridTemplateColumns = 'repeat(3, minmax(0, 1fr))';
-                grid.style.gap = '24px';
-              }
-            });
-
-            // Ensure text isn't truncated
-            const truncates = clonedElement.querySelectorAll('.truncate');
-            truncates.forEach(el => {
-              el.classList.remove('truncate');
-              el.style.whiteSpace = 'normal';
-              el.style.overflow = 'visible';
-              el.style.wordBreak = 'break-all';
-              el.style.lineHeight = '1.4';
-            });
-
-            // Make table visible without scroll
-            const tableContainer = clonedElement.querySelector('.overflow-x-auto');
-            if (tableContainer) {
-              tableContainer.style.overflow = 'visible';
-              tableContainer.classList.remove('overflow-x-auto');
-            }
           }
         }
       });
 
       const imgData = canvas.toDataURL("image/jpeg", 1.0);
       const pdf = new jsPDF("p", "mm", "a4");
+      
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      
+      const imgWidth = pdfWidth - 20; // 10mm margins
+      const imgHeight = (canvasHeight * imgWidth) / canvasWidth;
+      
+      let heightLeft = imgHeight;
+      let position = 10; // Start with 10mm top margin
 
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgWidth = pdfWidth - 20; // 10mm margin on each side
-      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+      // First Page
+      pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
+      heightLeft -= (pdfHeight - 20); // Account for margins
 
-      // If content is longer than A4, we might need multiple pages or scale down
-      // For now, let's fit it within margins
-      pdf.addImage(imgData, "JPEG", 10, 10, imgWidth, imgHeight);
-      pdf.save(`${land.title}_Official_Report.pdf`);
+      // Subsequent Pages if content is long
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight + 10; // 10mm top margin for new pages
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
+        heightLeft -= (pdfHeight - 20);
+      }
+
+      pdf.save(`${land.title}_Report.pdf`);
     } catch (err) {
       console.error("PDF Export Error:", err);
     }
@@ -171,7 +139,7 @@ const LandDetails = () => {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+    <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
       <div className="flex flex-col items-center gap-4">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
         <p className="text-gray-500 font-bold animate-pulse">Loading Report...</p>
@@ -182,28 +150,29 @@ const LandDetails = () => {
   if (!land) return <div className="text-center py-20 font-bold text-red-500">Land record not found</div>;
 
   const center = land.coordinates[0] ? [land.coordinates[0].lat, land.coordinates[0].lng] : [20.5937, 78.9629];
+  const verificationURL = `${window.location.origin}/land/${land._id}`;
 
   return (
-    <div className="min-h-screen bg-slate-50 pt-20 pb-12 px-4 sm:px-6">
+    <div className={`min-h-screen pt-20 pb-12 px-4 sm:px-6 transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
       <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 lg:mb-8 gap-4 bg-white p-3 sm:p-4 rounded-3xl shadow-sm border border-slate-100">
+        <div className={`flex flex-col sm:flex-row justify-between items-center mb-6 lg:mb-8 gap-4 p-3 sm:p-4 rounded-3xl shadow-sm border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
           <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
             <button
               onClick={() => navigate(-1)}
-              className="flex items-center justify-center gap-2 text-gray-500 hover:text-primary font-bold transition-all px-4 py-2.5 rounded-xl hover:bg-slate-50 border border-slate-100 sm:border-none flex-grow sm:flex-grow-0"
+              className={`flex items-center justify-center gap-2 font-bold transition-all px-4 py-2.5 rounded-xl border ${isDarkMode ? 'text-slate-300 border-slate-700 hover:bg-slate-800' : 'text-gray-500 border-slate-100 hover:bg-slate-50'} flex-grow sm:flex-grow-0`}
             >
-              <ArrowLeft className="w-5 h-5" /> Back
+              <ArrowLeft className="w-5 h-5" /> {t('back')}
             </button>
-            <div className="bg-slate-100 p-1 rounded-xl flex gap-1 flex-grow sm:flex-grow-0">
+            <div className={`p-1 rounded-xl flex gap-1 flex-grow sm:flex-grow-0 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
               <button
                 onClick={() => setMapType('normal')}
-                className={`flex-1 sm:px-4 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${mapType === 'normal' ? 'bg-primary text-white shadow-md' : 'text-gray-400 hover:bg-white'}`}
+                className={`flex-1 sm:px-4 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${mapType === 'normal' ? 'bg-primary text-white shadow-md' : 'text-gray-400 hover:bg-slate-700'}`}
               >
                 Normal
               </button>
               <button
                 onClick={() => setMapType('satellite')}
-                className={`flex-1 sm:px-4 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${mapType === 'satellite' ? 'bg-primary text-white shadow-md' : 'text-gray-400 hover:bg-white'}`}
+                className={`flex-1 sm:px-4 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${mapType === 'satellite' ? 'bg-primary text-white shadow-md' : 'text-gray-400 hover:bg-slate-700'}`}
               >
                 Satellite
               </button>
@@ -212,47 +181,48 @@ const LandDetails = () => {
           <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={() => navigate('/dashboard')}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-gray-600 hover:text-primary font-bold transition-colors px-4 py-2.5 rounded-xl hover:bg-slate-50 border border-slate-100 sm:border-none"
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold transition-colors px-4 py-2.5 rounded-xl border ${isDarkMode ? 'text-slate-300 border-slate-700 hover:bg-slate-800' : 'text-gray-600 border-slate-100 hover:bg-slate-50'}`}
             >
-              Dashboard
+              {t('dashboard')}
             </button>
             <button
               onClick={exportPDF}
               className="flex-1 sm:flex-none bg-primary hover:bg-primary-dark text-white px-6 sm:px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-primary/20 transition-all transform hover:-translate-y-0.5"
             >
-              <Download className="w-5 h-5" /> <span className="hidden sm:inline">Export PDF</span><span className="sm:hidden">PDF</span>
+              <Download className="w-5 h-5" /> <span className="hidden sm:inline">{t('export_pdf')}</span><span className="sm:hidden">PDF</span>
             </button>
           </div>
         </div>
 
-        <div id="report-content" className="bg-white rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200">
-          <div className="bg-white p-6 sm:p-10 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
+        <div id="report-content" className={`rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+          <div className={`p-6 sm:p-10 border-b flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left ${isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-100 bg-white'}`}>
             <div className="flex items-center gap-3">
               <div className="bg-primary p-2 rounded-xl">
                 <MapIcon className="text-white w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div>
                 <h2 className="text-lg sm:text-xl font-black text-primary tracking-tighter uppercase">SMART SURVEY SYSTEM</h2>
-                <p className="text-[8px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest">Digital Land Records & Analytics</p>
+                <p className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>Digital Land Records & Analytics</p>
               </div>
             </div>
             <div className="sm:text-right">
-              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Report ID</div>
+              <div className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>{t('report_id')}</div>
               <div className="text-xs font-mono font-bold text-primary">SLS-{land._id.substring(18).toUpperCase()}</div>
             </div>
           </div>
 
-          <div className="bg-primary p-6 sm:p-10 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div>
-              <div className="text-secondary-light font-bold uppercase tracking-widest text-[10px] sm:text-sm mb-2">Official Survey Report</div>
+          <div className="bg-primary p-6 sm:p-10 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
+            <Sparkles className="absolute -right-10 -top-10 w-64 h-64 text-white/5 rotate-12" />
+            <div className="relative z-10">
+              <div className="text-secondary-light font-bold uppercase tracking-widest text-[10px] sm:text-sm mb-2">{t('official_report')}</div>
               <h1 className="text-2xl sm:text-4xl font-extrabold">{land.title}</h1>
               <div className="flex items-center gap-2 text-blue-200 mt-4 opacity-80">
                 <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="text-xs sm:text-sm font-medium">Measured on {new Date(land.createdAt).toLocaleDateString()}</span>
+                <span className="text-xs sm:text-sm font-medium">{t('measured_on')} {new Date(land.createdAt).toLocaleDateString(i18n.language === 'gu' ? 'gu-IN' : 'en-US')}</span>
               </div>
             </div>
-            <div className="bg-white/10 backdrop-blur-md px-5 sm:px-6 py-3 sm:py-4 rounded-2xl border border-white/20 text-center w-full md:w-auto">
-              <div className="text-[10px] uppercase font-bold text-blue-200 mb-1">Status</div>
+            <div className="bg-white/10 backdrop-blur-md px-5 sm:px-6 py-3 sm:py-4 rounded-2xl border border-white/20 text-center w-full md:w-auto relative z-10">
+              <div className="text-[10px] uppercase font-bold text-blue-200 mb-1">{t('status')}</div>
               <div className={`font-bold text-sm sm:text-base flex items-center justify-center gap-2 ${land.status === 'approved' ? 'text-green-400' : land.status === 'rejected' ? 'text-red-400' : 'text-amber-400'}`}>
                 {land.status === 'approved' ? <CheckCircle className="w-5 h-5" /> : land.status === 'rejected' ? <XCircle className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
                 {land.status.toUpperCase()}
@@ -264,20 +234,20 @@ const LandDetails = () => {
             <div className="grid md:grid-cols-2 gap-10 lg:gap-12 mb-12">
               <div className="space-y-8">
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-primary mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
-                    <FileText className="w-5 h-5" /> Property Specifications
+                  <h3 className={`text-base sm:text-lg font-bold text-primary mb-4 flex items-center gap-2 border-b pb-2 ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                    <FileText className="w-5 h-5" /> {t('property_specs')}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                    <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                    <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50/50 border-slate-100'}`}>
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           <Ruler className="text-secondary w-4 h-4" />
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Area</span>
+                          <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>{t('area')}</span>
                         </div>
                         <select
                           value={displayUnit || ''}
                           onChange={(e) => handleUnitChange(e.target.value)}
-                          className="text-[9px] sm:text-[10px] bg-slate-100 border-none rounded px-1.5 py-0.5 font-bold text-primary focus:ring-0 outline-none cursor-pointer"
+                          className={`text-[9px] sm:text-[10px] border-none rounded px-1.5 py-0.5 font-bold text-primary focus:ring-0 outline-none cursor-pointer ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}
                         >
                           <option value="sq.meter">Sq. Meter</option>
                           <option value="sq.ft">Sq. Ft</option>
@@ -291,65 +261,32 @@ const LandDetails = () => {
                         {displayValue} <span className="text-[10px] sm:text-xs font-normal text-gray-500 uppercase">{displayUnit}</span>
                       </div>
                     </div>
-                    <DetailBox icon={<MapIcon className="text-secondary w-4 h-4" />} label="Points" value={`${land.coordinates.length} Markers`} />
-                    <DetailBox icon={<User className="text-secondary w-4 h-4" />} label="Surveyor" value={land.user?.name || 'Authorized User'} />
-                    <DetailBox icon={<Clock className="text-secondary w-4 h-4" />} label="Method" value={land.surveyMode === 'gps' ? 'GPS Capture' : 'Manual Map'} />
+                    <DetailBox icon={<MapIcon className="text-secondary w-4 h-4" />} label={t('points')} value={`${land.coordinates.length} Markers`} isDarkMode={isDarkMode} />
+                    <DetailBox icon={<User className="text-secondary w-4 h-4" />} label={t('surveyor')} value={land.user?.name || 'Authorized User'} isDarkMode={isDarkMode} />
+                    <DetailBox icon={<Clock className="text-secondary w-4 h-4" />} label={t('method')} value={land.surveyMode === 'gps' ? 'GPS Capture' : 'Manual Map'} isDarkMode={isDarkMode} />
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-primary mb-2">Description</h3>
-                  <p className="text-gray-600 text-sm sm:text-base leading-relaxed bg-slate-50 p-4 sm:p-6 rounded-2xl italic border border-slate-100">
-                    "{land.description || 'No additional notes provided for this survey.'}"
-                  </p>
-                </div>
-
-                {land.documents && land.documents.length > 0 && (
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold text-primary mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
-                      <FileText className="w-5 h-5" /> Related Documents
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
-                      {land.documents.map((doc, i) => {
-                        const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.url);
-                        const fileUrl = `${import.meta.env.VITE_API_URL}${doc.url}`;
-                        return (
-                          <div key={i} className="group relative bg-white border border-slate-200 rounded-3xl overflow-hidden hover:shadow-xl hover:border-primary transition-all duration-300">
-                            {isImage ? (
-                              <div className="h-40 w-full bg-slate-100 overflow-hidden">
-                                <img src={fileUrl} alt={doc.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                                  <button onClick={() => downloadFile(fileUrl, doc.name)} className="bg-white p-3 rounded-full text-primary hover:bg-primary hover:text-white transition-all transform hover:scale-110" title="Download">
-                                    <Save className="w-5 h-5" />
-                                  </button>
-                                  <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="bg-white p-3 rounded-full text-secondary hover:bg-secondary hover:text-white transition-all transform hover:scale-110" title="View Fullscreen">
-                                    <Eye className="w-5 h-5" />
-                                  </a>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="h-40 w-full bg-slate-50 flex items-center justify-center border-b border-slate-100">
-                                <FileText className="w-12 h-12 text-primary opacity-20" />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <button onClick={() => downloadFile(fileUrl, doc.name)} className="bg-white px-6 py-3 rounded-xl text-primary font-bold shadow-xl hover:bg-primary hover:text-white transition-all">
-                                    Download File
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                            <div className="p-4">
-                              <div className="text-sm font-bold text-gray-800 truncate" title={doc.name}>{doc.name}</div>
-                              <div className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">{isImage ? 'Image Document' : 'Official Document'}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="w-full">
+                    <h3 className={`text-base sm:text-lg font-bold text-primary mb-2`}>{t('description')}</h3>
+                    <p className={`text-sm sm:text-base leading-relaxed p-4 sm:p-6 rounded-2xl italic border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-100 text-gray-600'}`}>
+                      "{land.description || 'No additional notes provided for this survey.'}"
+                    </p>
+                  </div>
+                  
+                  {/* QR Code Section */}
+                  <div className={`p-4 rounded-3xl border flex flex-col items-center justify-center text-center ${isDarkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200 shadow-inner'}`}>
+                    <div className="bg-white p-2 rounded-xl mb-3">
+                      <QRCodeSVG value={verificationURL} size={100} level="H" includeMargin={true} />
                     </div>
+                    <div className="text-[10px] font-black text-primary uppercase tracking-wider">{t('verify_qr')}</div>
+                    <div className={`text-[8px] mt-1 font-mono ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>SLS-{land._id.toUpperCase()}</div>
                   </div>
-                )}
+                </div>
               </div>
 
-              <div className="rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden border-4 sm:border-8 border-slate-50 shadow-inner h-[300px] sm:h-[400px] relative">
+              <div className={`rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden border-4 sm:border-8 shadow-inner h-[300px] sm:h-[400px] relative ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
                 <MapContainer key={mapType} center={center} zoom={18} className="h-full w-full" preferCanvas={true}>
                   <TileLayer url={tileLayers[mapType]} crossOrigin="anonymous" />
                   <Polygon positions={land.coordinates.map(c => [c.lat, c.lng])} pathOptions={{ color: '#1e3a8a', fillColor: '#3b82f6', fillOpacity: 0.4, weight: 3 }} />
@@ -357,20 +294,71 @@ const LandDetails = () => {
               </div>
             </div>
 
-            <div className="mt-8 sm:mt-12">
-              <h3 className="text-base sm:text-lg font-bold text-primary mb-4">Boundary GPS Coordinates</h3>
-              <div className="bg-slate-50 rounded-2xl overflow-hidden border border-slate-100 overflow-x-auto custom-scrollbar">
+            {/* AI Crop Section - Enhanced */}
+            <div className={`mt-12 p-8 rounded-[2rem] border transition-all ${isDarkMode ? 'bg-gradient-to-br from-slate-900 to-primary/10 border-slate-700' : 'bg-gradient-to-br from-secondary/5 to-primary/5 border-secondary/20 shadow-inner'}`}>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-primary flex items-center gap-3">
+                    <Sparkles className="w-6 h-6 text-secondary" />
+                    {t('ai_insights')}
+                  </h3>
+                  <p className={`text-sm mt-1 font-medium ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{t('ai_crop_desc')}</p>
+                </div>
+                <div className="bg-secondary/10 text-secondary px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-secondary/20">
+                  AI Live Analysis
+                </div>
+              </div>
+              
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {suggestCrops(land.area.value).map((crop, i) => (
+                  <motion.div 
+                    key={i} 
+                    className={`p-6 rounded-3xl shadow-sm border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-secondary' : 'bg-white border-slate-100 hover:border-secondary'}`}
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="text-lg font-black text-primary">{i18n.language === 'gu' ? getGujaratiCropName(crop.name) : crop.name}</div>
+                      <div className="bg-secondary/10 text-secondary p-1.5 rounded-lg">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex justify-between text-[10px] font-bold uppercase mb-1">
+                          <span className={isDarkMode ? 'text-slate-500' : 'text-gray-400'}>{t('suitability')}</span>
+                          <span className="text-secondary">{crop.suitability}%</span>
+                        </div>
+                        <div className={`w-full h-2 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${crop.suitability}%` }}
+                            transition={{ duration: 1, delay: i * 0.1 }}
+                            className="bg-secondary h-full rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]"
+                          />
+                        </div>
+                      </div>
+                      <p className={`text-[11px] leading-relaxed font-medium ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                        {i18n.language === 'gu' ? getGujaratiReason(crop.name) : crop.reason}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-12">
+              <h3 className="text-base sm:text-lg font-bold text-primary mb-4">{t('boundary_gps')}</h3>
+              <div className={`rounded-2xl overflow-hidden border overflow-x-auto custom-scrollbar ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                 <table className="w-full text-left min-w-[500px]">
-                  <thead className="bg-slate-100 text-slate-500 text-[10px] sm:text-xs font-bold uppercase">
+                  <thead className={`text-[10px] sm:text-xs font-bold uppercase ${isDarkMode ? 'bg-slate-900 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
                     <tr>
-                      <th className="p-3 sm:p-4">Marker</th>
-                      <th className="p-3 sm:p-4">Latitude</th>
-                      <th className="p-3 sm:p-4">Longitude</th>
+                      <th className="p-3 sm:p-4">{t('marker')}</th>
+                      <th className="p-3 sm:p-4">{t('latitude')}</th>
+                      <th className="p-3 sm:p-4">{t('longitude')}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200">
+                  <tbody className={`divide-y ${isDarkMode ? 'divide-slate-700' : 'divide-slate-200'}`}>
                     {land.coordinates.map((coord, i) => (
-                      <tr key={i} className="text-xs sm:text-sm font-mono text-slate-700">
+                      <tr key={i} className={`text-xs sm:text-sm font-mono ${isDarkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-700 hover:bg-white'}`}>
                         <td className="p-3 sm:p-4 font-bold text-primary">#{i + 1}</td>
                         <td className="p-3 sm:p-4">{coord.lat.toFixed(6)}</td>
                         <td className="p-3 sm:p-4">{coord.lng.toFixed(6)}</td>
@@ -382,34 +370,16 @@ const LandDetails = () => {
             </div>
           </div>
 
-          <div className="bg-slate-50 border-t border-slate-200 p-8 flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
+          <div className={`border-t p-8 flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
             <div>
               <div className="text-xs font-bold text-primary mb-1">SMART LAND SURVEY SYSTEM OFFICE</div>
-              <p className="text-[10px] text-gray-500 max-w-xs leading-relaxed">Ahmedabad, Gujarat 380058</p>
+              <p className={`text-[10px] max-w-xs leading-relaxed ${isDarkMode ? 'text-slate-500' : 'text-gray-500'}`}>{t('address')}</p>
             </div>
             <div className="flex flex-col items-center md:items-end">
-              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Contact Details</div>
+              <div className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>{t('contact_details')}</div>
               <div className="text-xs font-bold text-primary">+91 93136 29723</div>
               <div className="text-xs text-secondary font-medium">info@smartsurvey.gujarat.gov.in</div>
             </div>
-          </div>
-        </div>
-
-        <div data-html2canvas-ignore="true" className="mt-12 p-8 bg-gradient-to-br from-secondary/5 to-primary/5 rounded-[2rem] border border-secondary/20 shadow-inner">
-          <h3 className="text-xl font-bold text-primary mb-6 flex items-center gap-2">
-            <span className="bg-secondary text-white p-1.5 rounded-lg text-xs">AI</span> Smart Agriculture Insights
-          </h3>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {suggestCrops(land.area.value).map((crop, i) => (
-              <div key={i} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                <div className="text-secondary font-bold mb-1">{crop.name}</div>
-                <div className="w-full bg-slate-100 h-1.5 rounded-full mb-3">
-                  <div className="bg-secondary h-full rounded-full" style={{ width: `${crop.suitability}%` }}></div>
-                </div>
-                <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">Suitability: {crop.suitability}%</div>
-                <p className="text-[11px] text-gray-500 leading-tight">{crop.reason}</p>
-              </div>
-            ))}
           </div>
         </div>
       </div>
@@ -417,14 +387,35 @@ const LandDetails = () => {
   );
 };
 
-const DetailBox = ({ icon, label, value }) => (
-  <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+const DetailBox = ({ icon, label, value, isDarkMode }) => (
+  <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50/50 border-slate-100'}`}>
     <div className="flex items-center gap-2 mb-1">
       {icon}
-      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{label}</span>
+      <span className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>{label}</span>
     </div>
-    <div className="text-lg font-extrabold text-primary">{value}</div>
+    <div className={`text-lg font-extrabold text-primary`}>{value}</div>
   </div>
 );
+
+// Helper functions for translation of dynamic content
+const getGujaratiCropName = (name) => {
+  const mapping = {
+    'Wheat': 'ઘઉં',
+    'Cotton': 'કપાસ',
+    'Sugarcane': 'શેરડી',
+    'Maize': 'મકાઈ'
+  };
+  return mapping[name] || name;
+};
+
+const getGujaratiReason = (name) => {
+  const mapping = {
+    'Wheat': 'આ વિસ્તારમાં જમીનનો ભેજ ઉત્તમ છે.',
+    'Cotton': 'તાપમાન કપાસના પાક માટે અનુકૂળ છે.',
+    'Sugarcane': 'પુષ્કળ પાણીની જરૂરિયાત પૂરી થઈ શકે તેમ છે.',
+    'Maize': 'જમીનમાં પાણીનો નિકાલ સારો છે.'
+  };
+  return mapping[name] || name;
+};
 
 export default LandDetails;

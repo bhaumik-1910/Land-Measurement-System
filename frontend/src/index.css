@@ -7,13 +7,18 @@
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light dark;
-  background-color: #f8fafc;
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  @apply transition-colors duration-300;
 }
 
 /* Custom Scrollbar */
@@ -21,14 +26,13 @@ body {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  @apply bg-slate-100 dark:bg-slate-900;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e3a8a;
-  border-radius: 4px;
+  @apply bg-primary rounded-full;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #172554;
+  @apply bg-primary-dark;
 }
 
 /* Leaflet drawing toolbar styles */
@@ -36,8 +40,31 @@ body {
   background-color: white !important;
 }
 
+.dark .leaflet-draw-toolbar a {
+  background-color: #1e293b !important;
+  color: white !important;
+}
+
 .glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border border-white/20 dark:border-white/10;
+}
+
+/* Premium Card Styles */
+.premium-card {
+  @apply bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-slate-200 dark:border-slate-800 transition-all duration-300 hover:shadow-2xl;
+}
+
+/* Dark mode specific overrides */
+.dark body {
+  background-color: #020617;
+  color: #f8fafc;
+}
+
+/* No Scrollbar Utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

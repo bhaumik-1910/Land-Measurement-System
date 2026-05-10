@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
+import { ThemeProvider, ThemeContext } from './context/ThemeContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
@@ -16,8 +17,6 @@ import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
 import { Toaster } from 'react-hot-toast';
 
-
-
 const PrivateRoute = ({ children, adminOnly = false }) => {
   const { user, loading } = React.useContext(AuthContext);
 
@@ -30,10 +29,11 @@ const PrivateRoute = ({ children, adminOnly = false }) => {
 
 const AppContent = () => {
   const location = useLocation();
+  const { isDarkMode } = React.useContext(ThemeContext);
   const hideFooter = ['/login', '/register'].includes(location.pathname);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className={`min-h-screen flex flex-col transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
       <Navbar />
       <main className="flex-grow">
         <Routes>
@@ -44,7 +44,6 @@ const AppContent = () => {
           <Route path="/privacy" element={<Privacy />} />
 
           <Route path="/dashboard" element={
-
             <PrivateRoute>
               <Dashboard />
             </PrivateRoute>
@@ -80,17 +79,17 @@ function App() {
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
-      <AuthProvider>
-        <Router>
-          <ScrollToTop />
-          <AppContent />
-          <Toaster position="top-right" reverseOrder={false} />
-        </Router>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <Router>
+            <ScrollToTop />
+            <AppContent />
+            <Toaster position="top-right" reverseOrder={false} />
+          </Router>
+        </AuthProvider>
+      </ThemeProvider>
     </GoogleOAuthProvider>
   );
 }
 
-
 export default App;
-

@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { MapContainer, TileLayer, FeatureGroup, useMap, Polygon } from 'react-leaflet';
 import { getAreaOfPolygon, getDistance } from 'geolib';
-import { Ruler, Save, Trash2, Map as MapIcon, Crosshair, Navigation, Layers, CheckCircle, ArrowRightLeft, Eye, EyeOff } from 'lucide-react';
+import { Ruler, Save, Trash2, Map as MapIcon, Crosshair, Navigation, Layers, CheckCircle, ArrowRightLeft, Eye, EyeOff, Sparkles } from 'lucide-react';
 import api from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { ThemeContext } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 
@@ -103,16 +105,17 @@ const MeasureLand = () => {
   const [documents, setDocuments] = useState([]);
   const [surveyMode, setSurveyMode] = useState('manual');
   const [isTracking, setIsTracking] = useState(false);
-  const [mapType, setMapType] = useState('normal');
+  const [mapType, setMapType] = useState('satellite');
   const [showMapDropdown, setShowMapDropdown] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const { isDarkMode } = useContext(ThemeContext);
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const watchId = useRef(null);
 
-  // Map Tile Layers
   // Map Tile Layers
   const tileLayers = {
     normal: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', // Google Normal
@@ -145,8 +148,8 @@ const MeasureLand = () => {
       'sq.ft': 10.7639,
       'acre': 0.000247105,
       'hectare': 0.0001,
-      'vigha': 0.00061776, // 1 sq.m = 0.00061776 vigha
-      'guntha': 0.009884, // 1 sq.m = 0.009884 guntha
+      'vigha': 0.00061776,
+      'guntha': 0.009884,
     };
     return (value * conversions[targetUnit]).toFixed(2);
   };
@@ -163,7 +166,7 @@ const MeasureLand = () => {
 
   const startTracking = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation not supported");
+      toast.error("Geolocation not supported");
       return;
     }
     setIsTracking(true);
@@ -217,7 +220,6 @@ const MeasureLand = () => {
       formData.append('area', area);
       formData.append('unit', unit);
       
-      // Append each document
       documents.forEach(doc => {
         formData.append('documents', doc);
       });
@@ -237,17 +239,17 @@ const MeasureLand = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col md:flex-row overflow-hidden relative">
-      {/* Mobile Header Overlay (Floating) */}
+    <div className={`h-[calc(100vh-64px)] flex flex-col md:flex-row overflow-hidden relative transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+      {/* Mobile Header Overlay */}
       <div className="absolute top-4 left-4 right-4 z-[1000] md:hidden pointer-events-none">
         <div className="flex flex-col gap-2">
-          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-white/20 pointer-events-auto flex justify-between items-center">
+          <div className={`backdrop-blur-md rounded-2xl p-4 shadow-2xl border pointer-events-auto flex justify-between items-center ${isDarkMode ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-white/20'}`}>
             <div className="flex items-center gap-3">
               <div className="bg-primary p-2 rounded-lg">
                 <Ruler className="text-white w-4 h-4" />
               </div>
               <div>
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Area</div>
+                <div className={`text-[10px] uppercase tracking-widest font-bold ${isDarkMode ? 'text-slate-500' : 'text-gray-500'}`}>{t('area')}</div>
                 <div className="flex items-center gap-1">
                   <div className="text-lg font-black text-secondary leading-none">
                     {convertArea(area, unit)}
@@ -255,7 +257,7 @@ const MeasureLand = () => {
                   <select
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
-                    className="bg-slate-100 text-[10px] font-bold text-gray-500 rounded-md border-none px-1 py-0.5 focus:ring-1 focus:ring-secondary outline-none cursor-pointer"
+                    className={`text-[10px] font-bold rounded-md border-none px-1 py-0.5 focus:ring-1 focus:ring-secondary outline-none cursor-pointer ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-gray-500'}`}
                   >
                     <option value="sq.meter">m²</option>
                     <option value="sq.ft">ft²</option>
@@ -272,22 +274,21 @@ const MeasureLand = () => {
               disabled={coordinates.length < 3}
               className="bg-secondary hover:bg-secondary-dark disabled:bg-gray-300 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg transition-all flex items-center gap-2"
             >
-              <Save className="w-4 h-4" /> Save
+              <Save className="w-4 h-4" /> {i18n.language === 'gu' ? 'સેવ' : 'Save'}
             </button>
           </div>
           
-          {/* Mobile Quick Toggles */}
           <div className="flex gap-2">
             <button 
               onClick={() => setSurveyMode(surveyMode === 'manual' ? 'gps' : 'manual')}
               className="bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-xl text-[10px] font-bold shadow-xl pointer-events-auto flex items-center gap-2 border border-white/10"
             >
               {surveyMode === 'manual' ? <Crosshair className="w-3 h-3" /> : <MapIcon className="w-3 h-3" />}
-              {surveyMode === 'manual' ? 'GPS Mode' : 'Manual Mode'}
+              {surveyMode === 'manual' ? (i18n.language === 'gu' ? 'GPS મોડ' : 'GPS Mode') : (i18n.language === 'gu' ? 'મેન્યુઅલ મોડ' : 'Manual Mode')}
             </button>
             <button 
               onClick={() => setMapType(mapType === 'normal' ? 'satellite' : 'normal')}
-              className="bg-white/80 backdrop-blur-md text-primary px-4 py-2 rounded-xl text-[10px] font-bold shadow-xl pointer-events-auto flex items-center gap-2 border border-black/5"
+              className={`backdrop-blur-md px-4 py-2 rounded-xl text-[10px] font-bold shadow-xl pointer-events-auto flex items-center gap-2 border ${isDarkMode ? 'bg-slate-800/80 text-white border-slate-700' : 'bg-white/80 text-primary border-black/5'}`}
             >
               <Layers className="w-3 h-3" />
               {mapType === 'normal' ? 'Satellite' : 'Normal'}
@@ -297,146 +298,122 @@ const MeasureLand = () => {
       </div>
 
       {/* Sidebar Controls (Desktop) */}
-      <div className="hidden md:flex w-96 bg-white border-r border-slate-200 flex-col overflow-hidden shadow-2xl z-20">
-        <div className="p-6 overflow-y-auto flex-grow custom-scrollbar">
+      <div className={`hidden md:flex w-[420px] border-r flex-col overflow-hidden shadow-2xl z-20 transition-colors duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+        <div className="p-6 overflow-y-auto flex-grow no-scrollbar">
           <div className="flex items-center space-x-2 mb-8">
             <div className="bg-primary p-2 rounded-lg">
               <Ruler className="text-white w-5 h-5" />
             </div>
-            <h2 className="text-2xl font-bold text-primary tracking-tight">Measurement Tool</h2>
+            <h2 className="text-2xl font-bold text-primary tracking-tight">{i18n.language === 'gu' ? 'માપણી ટૂલ' : 'Measurement Tool'}</h2>
           </div>
 
-          {/* Info Card */}
-          <div className="bg-slate-50 rounded-2xl p-6 mb-6 border border-slate-100">
-            <div className="text-sm text-gray-500 uppercase tracking-widest font-bold mb-2">Calculated Area</div>
-            <div className="flex items-baseline space-x-2">
-              <span className="text-4xl font-extrabold text-secondary">
+          {/* Area Card */}
+          <div className={`rounded-2xl p-6 mb-6 border transition-all ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+            <div className={`text-sm uppercase tracking-widest font-bold mb-3 ${isDarkMode ? 'text-slate-500' : 'text-gray-500'}`}>{i18n.language === 'gu' ? 'ગણતરી કરેલ વિસ્તાર' : 'Calculated Area'}</div>
+            <div className="flex flex-col gap-4">
+              <span className="text-5xl font-extrabold text-secondary tracking-tighter">
                 {convertArea(area, unit)}
               </span>
               <select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                className="bg-black text-white px-3 py-1 rounded-lg font-bold text-xs border-none focus:ring-2 focus:ring-secondary cursor-pointer outline-none shadow-md"
+                className={`w-full px-4 py-2.5 rounded-xl font-bold text-sm border-none focus:ring-2 focus:ring-secondary cursor-pointer outline-none shadow-lg transition-all ${isDarkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-black text-white hover:bg-slate-900'}`}
               >
-                <option value="sq.meter">Sq. Meter</option>
-                <option value="sq.ft">Sq. Ft</option>
+                <option value="sq.meter">Sq. Meter (m²)</option>
+                <option value="sq.ft">Sq. Ft (ft²)</option>
                 <option value="acre">Acre</option>
                 <option value="hectare">Hectare</option>
-                <option value="vigha">Vigha</option>
+                <option value="vigha">Vigha (Gujarat)</option>
                 <option value="guntha">Guntha</option>
               </select>
             </div>
           </div>
 
           {/* Perimeter Card */}
-          <div className="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100 flex items-center justify-between">
+          <div className={`rounded-2xl p-4 mb-6 border transition-colors flex items-center justify-between ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                 <ArrowRightLeft className="w-4 h-4 text-blue-600" />
               </div>
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Perimeter</div>
+              <div className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>{i18n.language === 'gu' ? 'પરિમિતિ' : 'Perimeter'}</div>
             </div>
             <div className="text-lg font-bold text-primary">{perimeter.toFixed(2)} m</div>
           </div>
 
           {/* Survey Mode Switch */}
           <div className="space-y-4 mb-6">
-            <div className="text-sm font-bold text-gray-400 uppercase tracking-wider">Survey Mode</div>
-            <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+            <div className={`text-sm font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>{i18n.language === 'gu' ? 'સર્વે મોડ' : 'Survey Mode'}</div>
+            <div className={`grid grid-cols-2 gap-2 p-1 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
               <button
                 onClick={() => { setSurveyMode('manual'); stopTracking(); }}
-                className={`py-2 rounded-lg font-medium transition-all ${surveyMode === 'manual' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}
+                className={`py-2 rounded-lg font-bold transition-all text-xs ${surveyMode === 'manual' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary dark:text-white' : 'text-gray-500'}`}
               >
-                Manual Draw
+                {i18n.language === 'gu' ? 'મેન્યુઅલ' : 'Manual Draw'}
               </button>
               <button
                 onClick={() => setSurveyMode('gps')}
-                className={`py-2 rounded-lg font-medium transition-all ${surveyMode === 'gps' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}
+                className={`py-2 rounded-lg font-bold transition-all text-xs ${surveyMode === 'gps' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary dark:text-white' : 'text-gray-500'}`}
               >
-                GPS Tracking
+                {i18n.language === 'gu' ? 'GPS ટ્રેકિંગ' : 'GPS Tracking'}
               </button>
             </div>
           </div>
 
           {/* GPS Controls */}
           {surveyMode === 'gps' && (
-            <div className="mb-6 p-4 bg-blue-50 rounded-2xl border border-blue-100">
-              <h4 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
-                <Navigation className="w-4 h-4" /> GPS Live Tracking
+            <div className={`mb-6 p-4 rounded-2xl border transition-all ${isDarkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-100'}`}>
+              <h4 className={`font-bold mb-2 flex items-center gap-2 ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>
+                <Navigation className="w-4 h-4" /> {i18n.language === 'gu' ? 'GPS લાઈવ ટ્રેકિંગ' : 'GPS Live Tracking'}
               </h4>
-              <p className="text-sm text-blue-700 mb-4">Walk along the perimeter of your land to map it automatically.</p>
+              <p className={`text-xs mb-4 ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>
+                {i18n.language === 'gu' ? 'તમારી જમીનની સીમા પર ચાલો જેથી તે ઓટોમેટિક મેપ થઈ જાય.' : 'Walk along the perimeter of your land to map it automatically.'}
+              </p>
               {!isTracking ? (
                 <button
                   onClick={startTracking}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md"
                 >
-                  <Crosshair className="w-5 h-5" /> Start Capture
+                  <Crosshair className="w-5 h-5" /> {i18n.language === 'gu' ? 'શરૂ કરો' : 'Start Capture'}
                 </button>
               ) : (
                 <button
                   onClick={stopTracking}
                   className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 animate-pulse transition-all shadow-md"
                 >
-                  <Trash2 className="w-5 h-5" /> Stop Capture
+                  <Trash2 className="w-5 h-5" /> {i18n.language === 'gu' ? 'બંધ કરો' : 'Stop Capture'}
                 </button>
               )}
-              <div className="mt-4 text-xs font-mono text-blue-800">
-                Captured Points: {coordinates.length}
+              <div className={`mt-4 text-xs font-mono font-bold ${isDarkMode ? 'text-blue-500' : 'text-blue-800'}`}>
+                {i18n.language === 'gu' ? 'કેપ્ચર કરેલા પોઈન્ટ્સ' : 'Captured Points'}: {coordinates.length}
               </div>
             </div>
           )}
 
-          {/* Map Layers Custom Dropdown */}
+          {/* Map Layer Select */}
           <div className="space-y-4 mb-6">
-            <div className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-              <MapIcon className="w-4 h-4" /> Map View
+            <div className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+              <MapIcon className="w-4 h-4" /> {i18n.language === 'gu' ? 'મેપ વ્યુ' : 'Map View'}
             </div>
-            <div className="relative group">
-              <button
-                onClick={() => setShowMapDropdown(!showMapDropdown)}
-                className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-black text-white font-bold transition-all shadow-2xl hover:bg-slate-900 border-none outline-none"
-              >
-                <div className="flex items-center gap-3 text-sm">
-                  {mapType === 'satellite' ? '🛰️ Satellite Map' : '🗺️ Normal Map'}
-                </div>
-                <Layers className={`w-5 h-5 transition-transform ${showMapDropdown ? 'rotate-180' : ''}`} />
-              </button>
-
-              <AnimatePresence>
-                {showMapDropdown && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute bottom-full left-0 right-0 mb-3 bg-black rounded-2xl overflow-hidden shadow-2xl border-none z-50"
-                  >
-                    <button
-                      onClick={() => { setMapType('normal'); setShowMapDropdown(false); }}
-                      className={`w-full text-left px-5 py-4 hover:bg-slate-800 transition-colors flex items-center gap-3 font-bold ${mapType === 'normal' ? 'text-secondary' : 'text-white'}`}
-                    >
-                      🗺️ Normal Map
-                    </button>
-                    <button
-                      onClick={() => { setMapType('satellite'); setShowMapDropdown(false); }}
-                      className={`w-full text-left px-5 py-4 hover:bg-slate-800 transition-colors flex items-center gap-3 font-bold ${mapType === 'satellite' ? 'text-secondary' : 'text-white'}`}
-                    >
-                      🛰️ Satellite Map
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <button
+              onClick={() => setMapType(mapType === 'normal' ? 'satellite' : 'normal')}
+              className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl font-bold transition-all shadow-lg border-none outline-none ${isDarkMode ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-black text-white hover:bg-slate-900'}`}
+            >
+              <div className="flex items-center gap-3 text-sm">
+                {mapType === 'satellite' ? '🛰️ Satellite Map' : '🗺️ Normal Map'}
+              </div>
+              <Layers className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
         {/* Save Button (Desktop) */}
-        <div className="p-6 border-t border-slate-100 bg-white">
+        <div className={`p-6 border-t transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
           <button
             onClick={() => setShowSaveModal(true)}
             disabled={coordinates.length < 3}
             className="w-full bg-secondary hover:bg-secondary-dark disabled:bg-gray-300 text-white py-4 rounded-2xl font-bold text-lg shadow-xl transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2"
           >
-            <Save className="w-5 h-5" /> Save Measurement
+            <Save className="w-5 h-5" /> {t('export_pdf').split(' ')[0]} {i18n.language === 'gu' ? 'રિપોર્ટ સેવ કરો' : 'Measurement'}
           </button>
         </div>
       </div>
@@ -448,7 +425,7 @@ const MeasureLand = () => {
           zoom={5}
           className="h-full w-full"
           scrollWheelZoom={true}
-          zoomControl={false} // Disable default to reposition or use custom
+          zoomControl={false}
         >
           <TileLayer key={mapType} url={tileLayers[mapType]} />
           <LocateControl />
@@ -457,7 +434,7 @@ const MeasureLand = () => {
             <GeomanControl onCreated={handleCreated} onEdited={handleEdited} />
           )}
 
-          {surveyMode === 'gps' && coordinates.length > 0 && (
+          {(surveyMode === 'gps' || coordinates.length > 0) && (
             <>
               <Polygon
                 positions={coordinates.map(c => [c.lat, c.lng])}
@@ -484,28 +461,27 @@ const MeasureLand = () => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative z-[2001]"
+              className={`rounded-3xl p-8 max-w-md w-full shadow-2xl relative z-[2001] border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}
             >
-              <h3 className="text-2xl font-bold text-primary mb-6 flex items-center gap-2">
-                <CheckCircle className="text-secondary" /> Finalize Measurement
+              <h3 className="text-2xl font-black text-primary mb-6 flex items-center gap-3">
+                <Sparkles className="text-secondary" /> {i18n.language === 'gu' ? 'માપણી પૂર્ણ કરો' : 'Finalize Measurement'}
               </h3>
-              {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">{error}</div>}
               <form onSubmit={handleSave} className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Survey Title</label>
+                  <label className={`block text-sm font-bold mb-2 ${isDarkMode ? 'text-slate-400' : 'text-gray-700'}`}>{i18n.language === 'gu' ? 'સર્વે ટાઈટલ' : 'Survey Title'}</label>
                   <input 
                     type="text" 
                     required
-                    className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 focus:ring-2 focus:ring-primary outline-none transition-all text-black placeholder:text-slate-400 shadow-sm"
+                    className={`w-full px-4 py-3 rounded-xl border outline-none transition-all shadow-sm ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:ring-primary' : 'bg-white border-slate-200 text-black placeholder:text-slate-400 focus:ring-primary'}`}
                     placeholder="e.g. West Farm Boundary"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Description / Notes</label>
+                  <label className={`block text-sm font-bold mb-2 ${isDarkMode ? 'text-slate-400' : 'text-gray-700'}`}>{t('description')}</label>
                   <textarea 
-                    className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 focus:ring-2 focus:ring-primary outline-none transition-all h-24 text-black placeholder:text-slate-400 shadow-sm resize-none"
+                    className={`w-full px-4 py-3 rounded-xl border outline-none transition-all h-24 shadow-sm resize-none ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:ring-primary' : 'bg-white border-slate-200 text-black placeholder:text-slate-400 focus:ring-primary'}`}
                     placeholder="Add any specific details about this measurement..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -514,8 +490,8 @@ const MeasureLand = () => {
                 
                 {/* File Upload Section */}
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Upload Documents (7/12, Photos, etc.)</label>
-                  <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-primary transition-colors cursor-pointer relative bg-slate-50 group">
+                  <label className={`block text-sm font-bold mb-2 ${isDarkMode ? 'text-slate-400' : 'text-gray-700'}`}>{i18n.language === 'gu' ? 'દસ્તાવેજો અપલોડ કરો (૭/૧૨, ફોટા, વગેરે)' : 'Upload Documents (7/12, Photos, etc.)'}</label>
+                  <div className={`border-2 border-dashed rounded-2xl p-6 text-center hover:border-primary transition-colors cursor-pointer relative group ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                     <input 
                       type="file" 
                       multiple 
@@ -529,8 +505,8 @@ const MeasureLand = () => {
                       <div className="bg-primary/10 p-3 rounded-full">
                         <Save className="w-6 h-6 text-primary" />
                       </div>
-                      <div className="text-sm font-bold text-gray-600">Click to upload or drag & drop</div>
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest">PDF, JPG, PNG allowed</p>
+                      <div className={`text-sm font-bold ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>{i18n.language === 'gu' ? 'અહીં ક્લિક કરો અથવા ફાઈલ ખેંચો' : 'Click to upload or drag & drop'}</div>
+                      <p className={`text-[10px] uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>PDF, JPG, PNG allowed</p>
                     </div>
                   </div>
                   
@@ -538,17 +514,9 @@ const MeasureLand = () => {
                   {documents.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {documents.map((file, i) => (
-                        <div key={i} className="bg-primary/5 border border-primary/20 px-3 py-1.5 rounded-lg text-[11px] font-bold text-primary flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1">
+                        <div key={i} className="bg-primary/5 border border-primary/20 px-3 py-1.5 rounded-lg text-[11px] font-bold text-primary flex items-center gap-2">
                           <span className="truncate max-w-[120px]">{file.name}</span>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setDocuments(prev => prev.filter((_, idx) => idx !== i));
-                            }}
-                            className="hover:text-red-500 transition-colors text-lg"
-                          >
-                            ×
-                          </button>
+                          <button type="button" onClick={() => setDocuments(prev => prev.filter((_, idx) => idx !== i))} className="hover:text-red-500 transition-colors text-lg">×</button>
                         </div>
                       ))}
                     </div>
@@ -559,7 +527,7 @@ const MeasureLand = () => {
                   <button
                     type="button"
                     onClick={() => setShowSaveModal(false)}
-                    className="flex-1 px-6 py-3 border border-slate-200 text-gray-500 rounded-xl font-bold hover:bg-slate-50 transition-all"
+                    className={`flex-1 px-6 py-3 border rounded-xl font-bold transition-all ${isDarkMode ? 'border-slate-700 text-slate-500 hover:bg-slate-800' : 'border-slate-200 text-gray-500 hover:bg-slate-50'}`}
                   >
                     Cancel
                   </button>
@@ -568,7 +536,7 @@ const MeasureLand = () => {
                     disabled={loading}
                     className="flex-1 px-6 py-3 bg-secondary hover:bg-secondary-dark text-white rounded-xl font-bold shadow-lg shadow-secondary/20 transition-all disabled:opacity-50"
                   >
-                    {loading ? 'Saving...' : 'Confirm & Save'}
+                    {loading ? 'Saving...' : (i18n.language === 'gu' ? 'સેવ કરો' : 'Confirm & Save')}
                   </button>
                 </div>
               </form>
