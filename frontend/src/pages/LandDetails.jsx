@@ -10,6 +10,7 @@ import { suggestCrops } from '../utils/cropAI';
 import { ThemeContext } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { QRCodeSVG } from 'qrcode.react';
+import toast from 'react-hot-toast';
 
 const LandDetails = () => {
   const { id } = useParams();
@@ -160,7 +161,8 @@ const LandDetails = () => {
     const element = document.getElementById("report-content");
     if (!element) return;
 
-    const loadingToast = i18n.language === 'gu' ? 'PDF ડાઉનલોડ થઈ રહી છે...' : 'Downloading PDF Report...';
+    // const loadingToast = i18n.language === 'gu' ? 'PDF ડાઉનલોડ થઈ રહી છે...' : 'Downloading PDF Report...';
+    const loadingToastId = toast.loading(i18n.language === 'gu' ? 'PDF ડાઉનલોડ થઈ રહી છે...' : 'Downloading PDF Report...');
 
     try {
       const canvas = await html2canvas(element, {
@@ -210,8 +212,10 @@ const LandDetails = () => {
       }
 
       pdf.save(`${land.title}_Report.pdf`);
+      toast.success('PDF downloaded successfully!', { id: loadingToastId });
     } catch (err) {
       console.error("PDF Export Error:", err);
+      toast.error('Failed to download PDF', { id: loadingToastId });
     }
   };
 
