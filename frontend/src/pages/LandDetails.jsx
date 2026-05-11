@@ -23,6 +23,8 @@ const LandDetails = () => {
   const [displayUnit, setDisplayUnit] = useState(null);
   const [displayValue, setDisplayValue] = useState(0);
   const [mapType, setMapType] = useState('satellite');
+  const [aiResults, setAiResults] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
     const fetchLand = async () => {
@@ -155,6 +157,31 @@ const LandDetails = () => {
   }) || [];
 
   const totalPerimeter = sideLengths.reduce((acc, len) => acc + len, 0).toFixed(2);
+
+  const runLiveAnalysis = async () => {
+    if (!land || !land.coordinates || land.coordinates.length === 0) {
+      toast.error('Land coordinates not available');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    const toastId = toast.loading('Running AI Live Analysis...');
+
+    try {
+      const { data } = await api.post('/ai/analyze-crops', {
+        coordinates: land.coordinates,
+        area: land.area.value,
+        unit: 'sq.meter'
+      });
+      setAiResults(data);
+      toast.success('Analysis complete!', { id: toastId });
+    } catch (err) {
+      console.error('AI Analysis failed:', err);
+      toast.error(err.response?.data?.message || 'Failed to run AI analysis', { id: toastId });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const exportPDF = async () => {
     window.scrollTo(0, 0);
@@ -422,7 +449,6 @@ const LandDetails = () => {
               </div>
             </div>
 
-            {/* AI Crop Section - Enhanced */}
             <div data-html2canvas-ignore="true" className={`mt-12 p-8 rounded-[2rem] border transition-all ${isDarkMode ? 'bg-gradient-to-br from-slate-900 to-primary/10 border-slate-700' : 'bg-gradient-to-br from-secondary/5 to-primary/5 border-secondary/20 shadow-inner'}`}>
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
@@ -432,45 +458,83 @@ const LandDetails = () => {
                   </h3>
                   <p className={`text-sm mt-1 font-medium ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{t('ai_crop_desc')}</p>
                 </div>
-                <div className="bg-secondary/10 text-secondary px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-secondary/20">
-                  AI Live Analysis
-                </div>
+                <button
+                  onClick={runLiveAnalysis}
+                  disabled={isAnalyzing}
+                  className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest border transition-all flex items-center gap-2 ${
+                    isAnalyzing 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    : 'bg-secondary/10 text-secondary border-secondary/20 hover:bg-secondary hover:text-white shadow-lg shadow-secondary/10'
+                  }`}
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-secondary border-t-transparent rounded-full animate-spin"></div>
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3" />
+                      AI Live Analysis
+                    </>
+                  )}
+                </button>
               </div>
 
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {suggestCrops(land.area.value).map((crop, i) => (
-                  <motion.div
-                    key={i}
-                    className={`p-6 rounded-3xl shadow-sm border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-secondary' : 'bg-white border-slate-100 hover:border-secondary'}`}
-                  >
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="text-lg font-black text-primary">{i18n.language === 'gu' ? getGujaratiCropName(crop.name) : crop.name}</div>
-                      <div className="bg-secondary/10 text-secondary p-1.5 rounded-lg">
-                        <Sparkles className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between text-[10px] font-bold uppercase mb-1">
-                          <span className={isDarkMode ? 'text-slate-500' : 'text-gray-400'}>{t('suitability')}</span>
-                          <span className="text-secondary">{crop.suitability}%</span>
-                        </div>
-                        <div className={`w-full h-2 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${crop.suitability}%` }}
-                            transition={{ duration: 1, delay: i * 0.1 }}
-                            className="bg-secondary h-full rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]"
-                          />
+              {aiResults ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {aiResults.map((crop, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      className={`p-6 rounded-3xl shadow-sm border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-secondary' : 'bg-white border-slate-100 hover:border-secondary'}`}
+                    >
+                      <div className="flex justify-between items-center mb-4">
+                        <div className="text-lg font-black text-primary">{i18n.language === 'gu' ? getGujaratiCropName(crop.name) : crop.name}</div>
+                        <div className="bg-secondary/10 text-secondary p-1.5 rounded-lg">
+                          <Sparkles className="w-4 h-4" />
                         </div>
                       </div>
-                      <p className={`text-[11px] leading-relaxed font-medium ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                        {i18n.language === 'gu' ? getGujaratiReason(crop) : crop.reason}
-                      </p>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between text-[10px] font-bold uppercase mb-1">
+                            <span className={isDarkMode ? 'text-slate-500' : 'text-gray-400'}>{t('suitability')}</span>
+                            <span className="text-secondary">{crop.suitability}%</span>
+                          </div>
+                          <div className={`w-full h-2 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${crop.suitability}%` }}
+                              transition={{ duration: 1 }}
+                              className="bg-secondary h-full rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]"
+                            />
+                          </div>
+                        </div>
+                        <p className={`text-[11px] leading-relaxed font-medium ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                          {i18n.language === 'gu' ? getGujaratiReason(crop) : crop.reason}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 opacity-40">
+                  {[1, 2, 3, 4].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`p-6 rounded-3xl border ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-100'}`}
+                    >
+                      <div className="h-6 w-24 bg-gray-200 rounded animate-pulse mb-4"></div>
+                      <div className="space-y-4">
+                        <div className="h-2 w-full bg-gray-100 rounded animate-pulse"></div>
+                        <div className="h-10 w-full bg-gray-50 rounded animate-pulse"></div>
+                      </div>
                     </div>
-                  </motion.div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="mt-12">

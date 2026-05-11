@@ -18,6 +18,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Keep ol
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/land', require('./routes/landRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/ai', require('./routes/aiRoutes'));
 
 // Root endpoint
 app.get('/', (req, res) => {

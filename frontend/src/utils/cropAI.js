@@ -6,7 +6,7 @@
 export const suggestCrops = (areaSqM, coordinates = []) => {
   // Use area as a seed for pseudo-randomness so the same plot always gets same results
   const seed = Math.floor(areaSqM) % 100;
-  
+
   // Larger pool of potential crops in Gujarat/India
   const allCrops = [
     { name: 'Wheat', baseSuitability: 85, minArea: 500, reason: 'Optimal soil moisture and seasonal climate detected.' },
@@ -29,7 +29,7 @@ export const suggestCrops = (areaSqM, coordinates = []) => {
     // Variance based on seed (area) and index
     const variance = ((seed + (index * 13)) % 15) - 7; // -7 to +7%
     const finalSuitability = Math.min(98, Math.max(40, crop.baseSuitability + variance));
-    
+
     return {
       ...crop,
       suitability: finalSuitability
