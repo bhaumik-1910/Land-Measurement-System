@@ -32,3 +32,7 @@ This is the Node.js/Express backend for the **Smart Land Measurement & Survey Sy
 npm install
 npm start
 ```
+**Developed with ❤️ for the Future of Agriculture & Urban Planning.**
+<div align="center">
+  <p>Made with ❤️ by Bhaumik Kothiya</p>
+</div>
