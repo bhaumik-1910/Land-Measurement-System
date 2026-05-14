@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { MapContainer, TileLayer, FeatureGroup, useMap, Polygon, CircleMarker, Popup, Tooltip } from 'react-leaflet';
 import { getAreaOfPolygon, getDistance } from 'geolib';
-import { Ruler, Save, Trash2, Map as MapIcon, Crosshair, Navigation, Layers, CheckCircle, ArrowRightLeft, Eye, EyeOff, Sparkles, MapPin, FileText } from 'lucide-react';
+import { Ruler, Save, Trash2, Map as MapIcon, Crosshair, Navigation, Layers, CheckCircle, ArrowRightLeft, Eye, EyeOff, Sparkles, MapPin, FileText, XCircle } from 'lucide-react';
 import api from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -118,6 +118,7 @@ const MeasureLand = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [map, setMap] = useState(null);
 
   const { isDarkMode } = useContext(ThemeContext);
   const { t, i18n } = useTranslation();
@@ -211,6 +212,35 @@ const MeasureLand = () => {
       watchId.current = null;
     }
     setIsTracking(false);
+  };
+
+  const handleCancel = () => {
+    setCoordinates([]);
+    setArea(0);
+    setPerimeter(0);
+    
+    // Clear GPS tracking if active
+    if (isTracking) {
+      stopTracking();
+    }
+
+    // Clear Geoman layers from map
+    if (map) {
+      if (map.pm) {
+        const layers = map.pm.getGeomanLayers();
+        layers.forEach(layer => {
+          map.removeLayer(layer);
+        });
+        
+        // Restart drawing mode to reset current active line
+        map.pm.disableDraw();
+        if (surveyMode === 'manual') {
+          map.pm.enableDraw('Polygon');
+        }
+      }
+    }
+    
+    toast.success(i18n.language === 'gu' ? 'બધું સાફ કરી દીધું' : 'Cleared all points');
   };
 
   useEffect(() => {
@@ -333,13 +363,22 @@ const MeasureLand = () => {
                 </div>
               </div>
             </div>
-            <button 
-              onClick={() => setShowSaveModal(true)}
-              disabled={coordinates.length < 3}
-              className="bg-secondary hover:bg-secondary-dark disabled:bg-gray-300 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg transition-all flex items-center gap-2"
-            >
-              <Save className="w-4 h-4" /> {i18n.language === 'gu' ? 'સેવ' : 'Save'}
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={handleCancel}
+                disabled={coordinates.length === 0 && !isTracking}
+                className={`px-4 py-2 rounded-xl font-bold text-xs shadow-lg transition-all flex items-center gap-2 ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-gray-500'} disabled:opacity-30`}
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => setShowSaveModal(true)}
+                disabled={coordinates.length < 3}
+                className="bg-secondary hover:bg-secondary-dark disabled:bg-gray-300 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg transition-all flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" /> {i18n.language === 'gu' ? 'સેવ' : 'Save'}
+              </button>
+            </div>
           </div>
           
           <div className="flex gap-2">
@@ -534,6 +573,14 @@ const MeasureLand = () => {
           >
             <Save className="w-6 h-6" /> {i18n.language === 'gu' ? 'માપણી સેવ કરો' : 'Export & Save'}
           </button>
+
+          <button
+            onClick={handleCancel}
+            disabled={coordinates.length === 0 && !isTracking}
+            className={`w-full mt-4 py-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-gray-500 hover:bg-slate-200'} disabled:opacity-30`}
+          >
+            <XCircle className="w-5 h-5" /> {i18n.language === 'gu' ? 'રદ કરો' : 'Cancel / Clear'}
+          </button>
         </div>
       </div>
 
@@ -545,6 +592,7 @@ const MeasureLand = () => {
           className="h-full w-full"
           scrollWheelZoom={true}
           zoomControl={false}
+          whenCreated={setMap}
         >
           <TileLayer key={mapType} url={tileLayers[mapType]} />
           <LocateControl />
