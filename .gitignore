@@ -1,0 +1,57 @@
+# ==========================================
+# Root .gitignore for Land Measurement System
+# ==========================================
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment Variables - NEVER COMMIT SENSITIVE SECRETS
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+**/.env
+**/.env.*
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# Allow example environment files
+!.env.example
+!**/.env.example
+
+# Build Artifacts
+dist/
+dist-ssr/
+build/
+**/dist/
+**/build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# User uploads in backend (keep directory with .gitkeep)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# System and IDE Files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
